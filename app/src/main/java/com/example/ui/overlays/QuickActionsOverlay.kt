@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
@@ -37,7 +36,6 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -57,17 +55,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.GlassSurface
-import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 
 @Composable
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
-  isScreenLockEnabled: Boolean = false,
   reducedMotion: Boolean = false,
-  onLockScreen: () -> Unit,
-  onOpenCalmScreen: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
@@ -139,19 +133,6 @@ fun QuickActionsOverlay(
 
         HorizontalDivider(color = MistColors.HairlineDivider)
 
-        QuickActionRow(
-          icon = Icons.Rounded.PowerSettingsNew,
-          label = stringResource(R.string.action_lock_screen),
-          badge = if (isScreenLockEnabled) "Ready" else "Setup",
-          testTag = "qa_lock_screen",
-          onClick = onLockScreen
-        )
-        QuickActionRow(
-          icon = Icons.Outlined.Bedtime,
-          label = stringResource(R.string.action_calm_screen),
-          testTag = "qa_calm_screen",
-          onClick = onOpenCalmScreen
-        )
         QuickActionRow(
           icon = Icons.Outlined.Apps,
           label = stringResource(R.string.action_app_library),

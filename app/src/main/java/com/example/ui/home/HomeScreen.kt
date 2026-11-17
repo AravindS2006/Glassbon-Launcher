@@ -32,7 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -403,9 +403,9 @@ fun HomeScreen(
       }
     }
 
-    // Bottom-right floating glass Lock / Calm button (Tap = Configured Quick Action, Long-press = Quick Actions menu)
+    // Bottom-right floating glass Quick Actions button (Tap = Configured Quick Action, Long-press = Quick Actions menu)
     FloatingCircleButton(
-      icon = Icons.Rounded.PowerSettingsNew,
+      icon = Icons.Rounded.Tune,
       contentDescription = stringResource(R.string.cd_open_quick_actions),
       testTag = "home_quick_actions_button",
       onClick = onPowerButtonTap,

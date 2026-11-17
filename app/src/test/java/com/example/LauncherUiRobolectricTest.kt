@@ -30,7 +30,7 @@ class LauncherUiRobolectricTest {
   val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
-  fun `home screen renders clock date alphabet rail and quick actions opens calm screen`() {
+  fun `home screen renders clock date alphabet rail and quick actions opens lock settings`() {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_clock_area").assertIsDisplayed()
@@ -39,36 +39,17 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on bottom-right Lock button opens One-Tap Screen Lock Accessibility prompt when disabled
+    // Single tap on bottom-right control opens Play-Protect-safe Quick Actions overlay
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("lock_open_app_info_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("lock_open_accessibility_button").assertIsDisplayed().performClick()
-    composeTestRule.waitForIdle()
-    val accessibilityIntent = shadowOf(composeTestRule.activity).nextStartedActivity
-    assertEquals(Settings.ACTION_ACCESSIBILITY_SETTINGS, accessibilityIntent?.action)
-    composeTestRule.onNodeWithTag("lock_permission_dialog").assertDoesNotExist()
-
-    // Fallback to OLED Calm Screen -> Quick Actions -> Lock Settings
-    composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_use_calm_button").assertIsDisplayed().performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("calm_quick_actions_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("qa_lock_screen").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("qa_calm_screen").assertIsDisplayed().performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("calm_lock_settings_button").assertIsDisplayed().performClick()
+    composeTestRule.onNodeWithTag("qa_lock_screen").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("qa_calm_screen").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     val startedIntent = shadowOf(composeTestRule.activity).nextStartedActivity
     assertEquals(Settings.ACTION_SECURITY_SETTINGS, startedIntent?.action)
-    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("quick_actions_overlay").assertDoesNotExist()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
   }
 

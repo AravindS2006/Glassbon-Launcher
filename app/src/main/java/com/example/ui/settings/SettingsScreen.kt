@@ -82,7 +82,6 @@ fun SettingsScreen(
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
-  onOpenAccessibilityLockSetup: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
@@ -247,7 +246,7 @@ fun SettingsScreen(
           )
           DividerLine()
           SegmentedPreferenceRow(
-            title = "Bottom-Right Lock Button Tap",
+            title = "Bottom-Right Button Tap",
             options = QuickActionMode.entries,
             selected = prefs.quickActionMode,
             label = { it.displayName },
@@ -293,17 +292,6 @@ fun SettingsScreen(
 
         // SYSTEM INTEGRATION
         SectionBlock(title = "System Integration") {
-          NavigationPreferenceRow(
-            title = "One-Tap Screen Lock Service",
-            subtitle = if (uiState.isScreenLockEnabled) {
-              "Enabled — Locks screen cleanly with biometrics"
-            } else {
-              "Tap to enable Glassbon One-Tap Lock in Accessibility"
-            },
-            testTag = "settings_accessibility_lock_row",
-            onClick = onOpenAccessibilityLockSetup
-          )
-          DividerLine()
           NavigationPreferenceRow(
             title = "Screen Lock & Security Settings",
             subtitle = "Open Android Lock Screen, PIN & display timeout settings",

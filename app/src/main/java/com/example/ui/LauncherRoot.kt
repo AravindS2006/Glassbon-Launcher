@@ -1,6 +1,5 @@
 package com.example.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -9,26 +8,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -47,14 +32,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.R
 import com.example.core.graphics.AppIconCache
-import com.example.platform.ClockSnapshot
 import com.example.platform.rememberSystemClockSnapshot
 import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.GlassSurface
@@ -67,7 +48,6 @@ import com.example.ui.settings.FavoritesManagerScreen
 import com.example.ui.settings.HiddenAppsScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.settings.WallpaperStudioScreen
-import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import kotlinx.coroutines.delay
@@ -88,7 +68,6 @@ fun LauncherRoot(
 
   val isOverlayBlockingLightTop = uiState.isDrawerOpen ||
     uiState.showQuickActions ||
-    uiState.showAmbientCalmScreen ||
     uiState.showWalkthrough ||
     uiState.contextMenuApp != null ||
     uiState.activeOverlay == LauncherOverlay.SETTINGS ||
@@ -288,10 +267,6 @@ fun LauncherRoot(
         onOpenWallpaperStudio = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavoritesManager = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenHiddenApps = { viewModel.openOverlay(LauncherOverlay.HIDDEN_APPS) },
-        onOpenAccessibilityLockSetup = {
-          viewModel.closeOverlay()
-          viewModel.openLockPermissionPrompt()
-        },
         onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartWalkthrough = { viewModel.startWalkthrough() },
@@ -351,10 +326,7 @@ fun LauncherRoot(
     ) {
       QuickActionsOverlay(
         isDefaultLauncher = uiState.isDefaultLauncher,
-        isScreenLockEnabled = uiState.isScreenLockEnabled,
         reducedMotion = prefs.effectiveReducedMotion,
-        onLockScreen = { viewModel.triggerScreenLock(context) },
-        onOpenCalmScreen = { viewModel.setAmbientCalmScreen(true) },
         onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
@@ -371,32 +343,7 @@ fun LauncherRoot(
       )
     }
 
-    // 6b. Prominent Disclosure Dialog for Accessibility-based One-Tap Screen Lock
-    if (uiState.showLockPermissionDialog) {
-      LockPermissionDialog(
-        onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings(context) },
-        onOpenAppInfo = { viewModel.openGlassbonAppInfo(context) },
-        onUseCalmScreen = { viewModel.setAmbientCalmScreen(true) },
-        onDismiss = { viewModel.dismissLockPermissionDialog() }
-      )
-    }
-
-    // 7. Pure #000000 OLED Calm Screen (Zero-permission visual sanctuary + direct Lock Settings shortcut)
-    AnimatedVisibility(
-      visible = uiState.showAmbientCalmScreen,
-      enter = fadeIn(tween(quickDuration)),
-      exit = fadeOut(tween(quickDuration))
-    ) {
-      AmbientCalmOverlay(
-        clockSnapshot = clockSnapshot,
-        showClock = prefs.showClock,
-        onOpenQuickActions = { viewModel.toggleQuickActions(true) },
-        onOpenLockSettings = { viewModel.openLockScreenSettings(context) },
-        onDismiss = { viewModel.setAmbientCalmScreen(false) }
-      )
-    }
-
-    // 7b. Interactive Frosted Feature Walkthrough Tour
+    // 7. Interactive Frosted Feature Walkthrough Tour
     AnimatedVisibility(
       visible = uiState.showWalkthrough,
       enter = fadeIn(tween(quickDuration)),
@@ -466,181 +413,3 @@ private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
     1.0f to Color(0x780B0B0D)
   )
 )
-
-@Composable
-private fun AmbientCalmOverlay(
-  clockSnapshot: ClockSnapshot,
-  showClock: Boolean,
-  onOpenQuickActions: () -> Unit,
-  onOpenLockSettings: () -> Unit,
-  onDismiss: () -> Unit
-) {
-  BackHandler(onBack = onDismiss)
-
-  Box(
-    modifier = Modifier
-      .fillMaxSize()
-      .background(Color.Black)
-      .clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        onClick = onDismiss
-      )
-      .testTag("ambient_calm_overlay")
-  ) {
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center,
-      modifier = Modifier
-        .align(Alignment.Center)
-        .padding(32.dp)
-    ) {
-      if (showClock) {
-        Text(
-          text = clockSnapshot.formattedTime,
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 54.sp,
-          color = Color(0x2EFFFFFF)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-      }
-      Text(
-        text = "OLED Calm Lock · Tap anywhere to return",
-        fontFamily = FunctionalSansFontFamily,
-        fontSize = 12.sp,
-        letterSpacing = 0.6.sp,
-        color = Color(0x42FFFFFF)
-      )
-    }
-
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier
-        .align(Alignment.BottomCenter)
-        .navigationBarsPadding()
-        .padding(bottom = 18.dp, start = 16.dp, end = 16.dp)
-    ) {
-      TextButton(
-        onClick = onOpenQuickActions,
-        modifier = Modifier
-          .heightIn(min = 48.dp)
-          .testTag("calm_quick_actions_button")
-      ) {
-        Text(
-          text = stringResource(R.string.action_quick_actions_short),
-          fontFamily = FunctionalSansFontFamily,
-          fontSize = 12.5.sp,
-          color = Color(0x88FFFFFF)
-        )
-      }
-      TextButton(
-        onClick = onOpenLockSettings,
-        modifier = Modifier
-          .heightIn(min = 48.dp)
-          .testTag("calm_lock_settings_button")
-      ) {
-        Text(
-          text = stringResource(R.string.action_lock_settings),
-          fontFamily = FunctionalSansFontFamily,
-          fontSize = 12.5.sp,
-          color = Color(0xA6FFFFFF)
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun LockPermissionDialog(
-  onOpenAccessibilitySettings: () -> Unit,
-  onOpenAppInfo: () -> Unit,
-  onUseCalmScreen: () -> Unit,
-  onDismiss: () -> Unit
-) {
-  Dialog(
-    onDismissRequest = onDismiss,
-    properties = DialogProperties(usePlatformDefaultWidth = false)
-  ) {
-    GlassSurface(
-      shape = RoundedCornerShape(24.dp),
-      backgroundColor = Color(0xEC16171B),
-      modifier = Modifier
-        .padding(horizontal = 24.dp)
-        .widthIn(min = 280.dp, max = 420.dp)
-        .testTag("lock_permission_dialog")
-    ) {
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 22.dp, vertical = 20.dp)
-      ) {
-        Text(
-          text = stringResource(R.string.lock_dialog_title),
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 24.sp,
-          color = MistColors.PureWhite
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-          text = stringResource(R.string.lock_dialog_body),
-          fontFamily = FunctionalSansFontFamily,
-          fontSize = 13.sp,
-          lineHeight = 19.sp,
-          color = MistColors.OffWhite.copy(alpha = 0.88f)
-        )
-        Spacer(modifier = Modifier.height(18.dp))
-        Button(
-          onClick = onOpenAccessibilitySettings,
-          shape = RoundedCornerShape(14.dp),
-          colors = ButtonDefaults.buttonColors(
-            containerColor = MistColors.PureWhite,
-            contentColor = MistColors.NearBlack
-          ),
-          modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .testTag("lock_open_accessibility_button")
-        ) {
-          Text(
-            text = stringResource(R.string.lock_dialog_open_accessibility),
-            fontFamily = FunctionalSansFontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.5.sp
-          )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedButton(
-          onClick = onOpenAppInfo,
-          shape = RoundedCornerShape(14.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .testTag("lock_open_app_info_button")
-        ) {
-          Text(
-            text = stringResource(R.string.lock_dialog_open_app_info),
-            fontFamily = FunctionalSansFontFamily,
-            fontSize = 13.sp,
-            color = MistColors.OffWhite
-          )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        TextButton(
-          onClick = onUseCalmScreen,
-          modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .heightIn(min = 48.dp)
-            .testTag("lock_use_calm_button")
-        ) {
-          Text(
-            text = stringResource(R.string.lock_dialog_use_calm),
-            fontFamily = FunctionalSansFontFamily,
-            fontSize = 12.5.sp,
-            color = MistColors.MistGrey
-          )
-        }
-      }
-    }
-  }
-}
