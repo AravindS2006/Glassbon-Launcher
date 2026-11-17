@@ -16,13 +16,14 @@ import com.example.data.preferences.HomeAlphabetVisibility
 import com.example.data.preferences.IconSize
 import com.example.data.preferences.IconStyle
 import com.example.data.preferences.LauncherPreferences
+import com.example.data.preferences.PerformanceProfile
 import com.example.data.preferences.PreferencesRepository
 import com.example.data.preferences.QuickActionMode
 import com.example.data.preferences.TypographyStyle
 import com.example.data.wallpaper.ProcessedWallpaper
 import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
-import com.example.platform.GlassbonLockAccessibilityService
+import com.example.platform.GlassbonDeviceAdminReceiver
 import com.example.platform.GlassbonMediaListenerService
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +97,7 @@ data class LauncherUiState(
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isLockAccessibilityEnabled: Boolean = false,
+  val isDeviceAdminLockEnabled: Boolean = false,
   val isMediaListenerEnabled: Boolean = false,
   val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
@@ -129,7 +130,7 @@ private data class TransientUiState(
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isLockAccessibilityEnabled: Boolean = false,
+  val isDeviceAdminLockEnabled: Boolean = false,
   val isMediaListenerEnabled: Boolean = false,
   val statusMessage: String? = null
 )
@@ -148,7 +149,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   private val transientState = MutableStateFlow(
     TransientUiState(
       isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-      isLockAccessibilityEnabled = GlassbonLockAccessibilityService.isServiceEnabled(appContext),
+      isDeviceAdminLockEnabled = GlassbonDeviceAdminReceiver.isAdminActive(appContext),
       isMediaListenerEnabled = GlassbonMediaListenerService.isPermissionGranted(appContext)
     )
   )
@@ -242,7 +243,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
-      isLockAccessibilityEnabled = transient.isLockAccessibilityEnabled,
+      isDeviceAdminLockEnabled = transient.isDeviceAdminLockEnabled,
       isMediaListenerEnabled = transient.isMediaListenerEnabled,
       activeMedia = media,
       preferences = derived.prefs,
@@ -276,7 +277,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             path = prefs.customWallpaperPath,
             grayscale = prefs.grayscaleWallpaper,
             blur = prefs.drawerBlurIntensity,
-            lowEffects = prefs.lowEffectsMode
+            lowEffects = prefs.effectiveLowEffects
           )
         }
         .distinctUntilChanged()
@@ -291,14 +292,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // One-shot background prewarm of app icons so App Drawer opens and scrolls at 60-120 FPS
+    // One-shot background prewarm of app icons in Ultra-Smooth mode so App Drawer opens & scrolls at 60-120 FPS;
+    // skipped in Low Power mode to avoid background CPU/RAM work.
     viewModelScope.launch {
       combine(
         appRepository.apps,
-        preferencesRepository.preferences.map { it.iconStyle }.distinctUntilChanged()
-      ) { apps, style -> apps to style }
-        .collect { (apps, style) ->
-          if (apps.isNotEmpty()) {
+        preferencesRepository.preferences
+          .map { it.iconStyle to it.isPowerSaver }
+          .distinctUntilChanged()
+      ) { apps, (style, powerSaver) -> Triple(apps, style, powerSaver) }
+        .collect { (apps, style, powerSaver) ->
+          if (!powerSaver && apps.isNotEmpty()) {
             iconCache.prewarm(apps, style)
           }
         }
@@ -352,7 +356,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update {
       it.copy(
         isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-        isLockAccessibilityEnabled = GlassbonLockAccessibilityService.isServiceEnabled(appContext),
+        isDeviceAdminLockEnabled = GlassbonDeviceAdminReceiver.isAdminActive(appContext),
         isMediaListenerEnabled = GlassbonMediaListenerService.isPermissionGranted(appContext)
       )
     }
@@ -433,7 +437,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun lockScreenOrPrompt() {
-    if (GlassbonLockAccessibilityService.lockScreenNow()) {
+    if (GlassbonDeviceAdminReceiver.lockScreenNow(appContext)) {
       transientState.update { it.copy(showQuickActions = false, showLockPermissionPrompt = false) }
     } else {
       transientState.update { it.copy(showQuickActions = false, showLockPermissionPrompt = true) }
@@ -444,9 +448,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update { it.copy(showLockPermissionPrompt = false) }
   }
 
-  fun openAccessibilitySettings() {
+  fun openDeviceAdminActivation() {
     dismissLockPermissionPrompt()
-    SystemActionsHelper.openAccessibilitySettings(appContext)
+    SystemActionsHelper.openDeviceAdminLockActivation(appContext)
   }
 
   fun openNotificationListenerSettings() {
@@ -673,6 +677,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun setSearchAutoFocusKeyboard(enabled: Boolean) {
     viewModelScope.launch { preferencesRepository.setSearchAutoFocusKeyboard(enabled) }
+  }
+
+  fun setPerformanceProfile(profile: PerformanceProfile) {
+    viewModelScope.launch { preferencesRepository.setPerformanceProfile(profile) }
   }
 
   fun setReducedMotion(enabled: Boolean) {

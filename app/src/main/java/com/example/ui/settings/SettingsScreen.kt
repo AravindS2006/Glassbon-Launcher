@@ -50,6 +50,7 @@ import com.example.R
 import com.example.data.preferences.HomeAlphabetVisibility
 import com.example.data.preferences.IconSize
 import com.example.data.preferences.IconStyle
+import com.example.data.preferences.PerformanceProfile
 import com.example.data.preferences.QuickActionMode
 import com.example.data.preferences.TypographyStyle
 import com.example.ui.LauncherUiState
@@ -61,6 +62,7 @@ import com.example.ui.theme.MistColors
 @Composable
 fun SettingsScreen(
   uiState: LauncherUiState,
+  onSetPerformanceProfile: (PerformanceProfile) -> Unit,
   onSetIconStyle: (IconStyle) -> Unit,
   onSetIconSize: (IconSize) -> Unit,
   onSetTypographyStyle: (TypographyStyle) -> Unit,
@@ -80,7 +82,7 @@ fun SettingsScreen(
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
-  onOpenAccessibilitySettings: () -> Unit,
+  onOpenDeviceAdminActivation: () -> Unit,
   onOpenNotificationListenerSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
@@ -136,6 +138,23 @@ fun SettingsScreen(
           .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
       ) {
+        // PERFORMANCE & BATTERY
+        SectionBlock(title = "Performance & Battery") {
+          SegmentedPreferenceRow(
+            title = "Performance Mode",
+            subtitle = if (prefs.isPowerSaver) {
+              "Low Power active — blur, motion & background prewarm reduced for battery"
+            } else {
+              "Ultra-Smooth active — 120Hz GPU springs, frosted blur & prewarmed icons"
+            },
+            options = PerformanceProfile.entries,
+            selected = prefs.performanceProfile,
+            label = { it.displayName },
+            optionTestTag = { "perf_mode_${it.name.lowercase()}" },
+            onSelect = onSetPerformanceProfile
+          )
+        }
+
         // APPEARANCE
         SectionBlock(title = "Appearance") {
           SegmentedPreferenceRow(
@@ -275,14 +294,14 @@ fun SettingsScreen(
         // SYSTEM PERMISSIONS & LAUNCHER ROLE
         SectionBlock(title = "System Integration") {
           NavigationPreferenceRow(
-            title = "One-Tap Screen Lock (Accessibility)",
-            subtitle = if (uiState.isLockAccessibilityEnabled) {
+            title = "One-Tap Screen Lock (Device Admin)",
+            subtitle = if (uiState.isDeviceAdminLockEnabled) {
               "Active — power button locks screen instantly"
             } else {
-              "Tap to enable Glassbon Screen Lock"
+              "Tap to activate Glassbon Screen Lock"
             },
-            testTag = "settings_accessibility_row",
-            onClick = onOpenAccessibilitySettings
+            testTag = "settings_device_admin_row",
+            onClick = onOpenDeviceAdminActivation
           )
           DividerLine()
           NavigationPreferenceRow(
@@ -452,7 +471,9 @@ private fun <T> SegmentedPreferenceRow(
   options: List<T>,
   selected: T,
   label: (T) -> String,
-  onSelect: (T) -> Unit
+  onSelect: (T) -> Unit,
+  subtitle: String? = null,
+  optionTestTag: ((T) -> String)? = null
 ) {
   Column(
     modifier = Modifier
@@ -465,6 +486,15 @@ private fun <T> SegmentedPreferenceRow(
       fontSize = 14.5.sp,
       color = MistColors.OffWhite
     )
+    if (subtitle != null) {
+      Spacer(modifier = Modifier.height(2.dp))
+      Text(
+        text = subtitle,
+        fontFamily = FunctionalSansFontFamily,
+        fontSize = 12.sp,
+        color = MistColors.FrostedGrey
+      )
+    }
     Spacer(modifier = Modifier.height(10.dp))
     Row(
       modifier = Modifier
@@ -475,8 +505,10 @@ private fun <T> SegmentedPreferenceRow(
       options.forEach { option ->
         val isSelected = option == selected
         val shape = RoundedCornerShape(10.dp)
+        val tagModifier = optionTestTag?.let { Modifier.testTag(it(option)) } ?: Modifier
         Box(
           modifier = Modifier
+            .then(tagModifier)
             .heightIn(min = 38.dp)
             .clip(shape)
             .background(

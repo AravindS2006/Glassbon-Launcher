@@ -169,7 +169,8 @@ fun FavoritesManagerScreen(
                   app = app,
                   iconCache = iconCache,
                   iconStyle = prefs.iconStyle,
-                  tileSize = 34.dp
+                  tileSize = 34.dp,
+                  lowPowerMode = prefs.effectiveLowEffects
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -262,7 +263,8 @@ fun FavoritesManagerScreen(
               app = app,
               iconCache = iconCache,
               iconStyle = prefs.iconStyle,
-              tileSize = 32.dp
+              tileSize = 32.dp,
+              lowPowerMode = prefs.effectiveLowEffects
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(

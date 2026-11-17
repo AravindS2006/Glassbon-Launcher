@@ -4,7 +4,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -31,10 +33,11 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on power button prompts to enable Accessibility Screen Lock when not active
+    // Single tap on power button prompts to activate Device Admin Screen Lock when not active
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("lock_dialog_admin_button").assertIsDisplayed()
     composeTestRule.onNodeWithTag("lock_dialog_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
@@ -100,6 +103,22 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("qa_preferences").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+
+    // Defaults to Ultra-Smooth and can switch to Low Power and back
+    composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("perf_mode_power_saver").assertIsDisplayed().performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithText("Low Power active", substring = true)
+        .fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithText("Low Power active", substring = true).assertIsDisplayed()
+    composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithText("Ultra-Smooth active", substring = true)
+        .fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithText("Ultra-Smooth active", substring = true).assertIsDisplayed()
+
     composeTestRule.onNodeWithTag("settings_back_button").performClick()
     composeTestRule.waitForIdle()
 

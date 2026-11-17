@@ -7,7 +7,7 @@
 - **No Network Access**: The app does **not** declare `android.permission.INTERNET` and sends zero telemetry, analytics, or crash payloads.
 - **Minimal Permissions**:
   - Custom wallpapers use Android's zero-permission Photo Picker (`ActivityResultContracts.PickVisualMedia`).
-  - `GlassbonLockAccessibilityService` declares `canRetrieveWindowContent="false"` and executes only `GLOBAL_ACTION_LOCK_SCREEN`.
+  - `GlassbonDeviceAdminReceiver` requests strictly `force-lock` solely to lock the screen on power button tap—no Accessibility Service, no `REQUEST_DELETE_PACKAGES` (uninstalls route safely to system App Info).
   - `GlassbonMediaListenerService` reads active `MediaController` playback state/metadata locally on-device solely to render Home playback controls.
 
 ## Supported Versions

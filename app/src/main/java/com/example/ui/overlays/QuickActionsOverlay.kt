@@ -213,7 +213,7 @@ fun QuickActionsOverlay(
 
 @Composable
 fun LockPermissionDialog(
-  onOpenAccessibility: () -> Unit,
+  onActivateDeviceAdmin: () -> Unit,
   onOpenQuickActions: () -> Unit,
   onDismiss: () -> Unit
 ) {
@@ -283,8 +283,8 @@ fun LockPermissionDialog(
             )
           }
           TextButton(
-            onClick = onOpenAccessibility,
-            modifier = Modifier.testTag("lock_dialog_accessibility_button")
+            onClick = onActivateDeviceAdmin,
+            modifier = Modifier.testTag("lock_dialog_admin_button")
           ) {
             Text(
               text = stringResource(R.string.lock_permission_cta),

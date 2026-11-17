@@ -85,7 +85,7 @@ fun LauncherRoot(
   }
 
   val transitionDurationMs = when {
-    prefs.reducedMotion -> 0
+    prefs.effectiveReducedMotion -> 0
     uiState.isDrawerOpen -> 220
     else -> 180
   }
@@ -146,7 +146,7 @@ fun LauncherRoot(
       )
     }
 
-    // 2. Pre-blurred frosted-glass wallpaper layer for the App Drawer (single blended scrim to cut overdraw)
+    // 2. Pre-blurred frosted-glass wallpaper layer for the App Drawer (skips duplicate image pass in Low Power mode)
     if (showDrawerLayer) {
       val drawerBmp = uiState.wallpaper.drawerBlurredBitmap ?: homeBmp
       Box(
@@ -154,7 +154,7 @@ fun LauncherRoot(
           .fillMaxSize()
           .graphicsLayer { alpha = drawerProgressState.value }
       ) {
-        if (drawerBmp != null) {
+        if (!prefs.effectiveLowEffects && drawerBmp != null) {
           Image(
             bitmap = drawerBmp,
             contentDescription = null,
@@ -165,7 +165,7 @@ fun LauncherRoot(
         Box(
           modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x76141519))
+            .background(if (prefs.effectiveLowEffects) Color(0xBD0D0E11) else Color(0x76141519))
         )
       }
     }
@@ -227,7 +227,7 @@ fun LauncherRoot(
     }
 
     // 5. Secondary Settings / Customization overlays
-    val overlayFadeDuration = if (prefs.reducedMotion) 0 else 160
+    val overlayFadeDuration = if (prefs.effectiveReducedMotion) 0 else 160
     AnimatedVisibility(
       visible = uiState.activeOverlay == LauncherOverlay.SETTINGS,
       enter = fadeIn(tween(overlayFadeDuration)),
@@ -235,6 +235,7 @@ fun LauncherRoot(
     ) {
       SettingsScreen(
         uiState = uiState,
+        onSetPerformanceProfile = viewModel::setPerformanceProfile,
         onSetIconStyle = viewModel::setIconStyle,
         onSetIconSize = viewModel::setIconSize,
         onSetTypographyStyle = viewModel::setTypographyStyle,
@@ -254,7 +255,7 @@ fun LauncherRoot(
         onOpenWallpaperStudio = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavoritesManager = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenHiddenApps = { viewModel.openOverlay(LauncherOverlay.HIDDEN_APPS) },
-        onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
+        onOpenDeviceAdminActivation = { viewModel.openDeviceAdminActivation() },
         onOpenNotificationListenerSettings = { viewModel.openNotificationListenerSettings() },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartWalkthrough = { viewModel.startWalkthrough() },
@@ -306,7 +307,7 @@ fun LauncherRoot(
     }
 
     // 6. Quick Actions Panel
-    val quickDuration = if (prefs.reducedMotion) 0 else 150
+    val quickDuration = if (prefs.effectiveReducedMotion) 0 else 150
     AnimatedVisibility(
       visible = uiState.showQuickActions,
       enter = fadeIn(tween(quickDuration)),
@@ -315,7 +316,7 @@ fun LauncherRoot(
       QuickActionsOverlay(
         isDefaultLauncher = uiState.isDefaultLauncher,
         isMediaListenerEnabled = uiState.isMediaListenerEnabled,
-        reducedMotion = prefs.reducedMotion,
+        reducedMotion = prefs.effectiveReducedMotion,
         onLockScreen = { viewModel.lockScreenOrPrompt() },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
@@ -333,14 +334,14 @@ fun LauncherRoot(
       )
     }
 
-    // 7. Accessibility Lock Permission Guidance Dialog
+    // 7. Device Admin Lock Permission Guidance Dialog
     AnimatedVisibility(
       visible = uiState.showLockPermissionPrompt,
       enter = fadeIn(tween(quickDuration)),
       exit = fadeOut(tween(quickDuration))
     ) {
       LockPermissionDialog(
-        onOpenAccessibility = { viewModel.openAccessibilitySettings() },
+        onActivateDeviceAdmin = { viewModel.openDeviceAdminActivation() },
         onOpenQuickActions = { viewModel.toggleQuickActions(true) },
         onDismiss = { viewModel.dismissLockPermissionPrompt() }
       )
@@ -354,7 +355,7 @@ fun LauncherRoot(
     ) {
       WalkthroughOverlay(
         currentStep = uiState.walkthroughStep,
-        reducedMotion = prefs.reducedMotion,
+        reducedMotion = prefs.effectiveReducedMotion,
         onStepChange = { viewModel.setWalkthroughStep(it) },
         onFinish = { viewModel.finishWalkthrough() }
       )
@@ -372,7 +373,8 @@ fun LauncherRoot(
         isHidden = contextApp.componentKey in prefs.hiddenKeys,
         iconCache = iconCache,
         iconStyle = prefs.iconStyle,
-        reducedMotion = prefs.reducedMotion,
+        reducedMotion = prefs.effectiveReducedMotion,
+        lowPowerMode = prefs.effectiveLowEffects,
         onToggleFavorite = { viewModel.toggleFavorite(contextApp) },
         onMoveFavoriteEarlier = { viewModel.moveFavorite(contextApp.componentKey, -1) },
         onMoveFavoriteLater = { viewModel.moveFavorite(contextApp.componentKey, 1) },

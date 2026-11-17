@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -125,6 +126,7 @@ fun AlphabetRail(
 
   val isLeft = side == AlphabetRailSide.LEFT
   val dirSign = if (isLeft) 1f else -1f
+  val verticalPadPx = with(density) { 4.dp.toPx() }
   val maxCurvePx = with(density) { 40.dp.toPx() }
   val sigmaPx = with(density) { 52.dp.toPx() }
   val bubbleHalfSizePx = with(density) { 27.dp.toPx() }
@@ -134,9 +136,11 @@ fun AlphabetRail(
   fun dispatchIndexForY(y: Float) {
     val heightPx = railHeightPxState.intValue
     if (heightPx <= 0) return
-    val clampedY = y.coerceIn(0f, heightPx.toFloat())
+    val maxY = (heightPx - verticalPadPx).coerceAtLeast(verticalPadPx)
+    val clampedY = y.coerceIn(verticalPadPx, maxY)
     pointerYState.floatValue = clampedY
-    val idx = ((clampedY / heightPx.toFloat()) * entries.size)
+    val usableH = (heightPx - verticalPadPx * 2f).coerceAtLeast(1f)
+    val idx = (((clampedY - verticalPadPx) / usableH) * entries.size)
       .toInt()
       .coerceIn(0, entries.lastIndex)
     if (idx != lastSelectedIndex) {
@@ -160,7 +164,7 @@ fun AlphabetRail(
       .width(42.dp),
     contentAlignment = containerAlign
   ) {
-    // Unified zero-slop pointer handler: blooms wave immediately on down and tracks at native frame rate
+    // Unified zero-slop pointer handler with stationary tap stabilization & full-height 1:1 coordinate mapping
     Box(
       modifier = Modifier
         .align(containerAlign)
@@ -168,13 +172,16 @@ fun AlphabetRail(
         .fillMaxHeight()
         .onSizeChanged { railHeightPxState.intValue = it.height }
         .pointerInput(entries) {
+          val touchSlopPx = viewConfiguration.touchSlop
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             down.consume()
+            val downY = down.position.y
+            var scrubUnlocked = false
             lastSelectedIndex = -1
             isDragging = true
             isWaveVisible = true
-            dispatchIndexForY(down.position.y)
+            dispatchIndexForY(downY)
 
             while (true) {
               val event = awaitPointerEvent()
@@ -184,7 +191,12 @@ fun AlphabetRail(
                 break
               }
               change.consume()
-              dispatchIndexForY(change.position.y)
+              if (!scrubUnlocked && abs(change.position.y - downY) >= touchSlopPx) {
+                scrubUnlocked = true
+              }
+              if (scrubUnlocked) {
+                dispatchIndexForY(change.position.y)
+              }
             }
 
             isDragging = false
@@ -212,11 +224,13 @@ fun AlphabetRail(
 
       AlphabetLetterColumn(
         entries = entries,
+        railTag = railTag,
         availableSections = availableSections,
         hasFavorites = hasFavorites,
         invisibleMode = invisibleMode,
         useDarkIdleInk = isEdgeBright && !invisibleMode,
         dirSign = dirSign,
+        verticalPadPx = verticalPadPx,
         maxCurvePx = maxCurvePx,
         sigmaPx = sigmaPx,
         activeKeyProvider = activeKeyProvider,
@@ -227,6 +241,7 @@ fun AlphabetRail(
         modifier = Modifier
           .align(containerAlign)
           .width(34.dp)
+          .fillMaxHeight()
           .padding(vertical = 4.dp)
       )
     }
@@ -300,11 +315,13 @@ private fun AlphabetWaveBubble(
 @Composable
 private fun AlphabetLetterColumn(
   entries: List<String>,
+  railTag: String,
   availableSections: Set<String>,
   hasFavorites: Boolean,
   invisibleMode: Boolean,
   useDarkIdleInk: Boolean,
   dirSign: Float,
+  verticalPadPx: Float,
   maxCurvePx: Float,
   sigmaPx: Float,
   activeKeyProvider: () -> String?,
@@ -317,28 +334,31 @@ private fun AlphabetLetterColumn(
   Column(
     modifier = modifier,
     horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.spacedBy(1.dp)
+    verticalArrangement = Arrangement.Top
   ) {
     val favCd = stringResource(R.string.cd_favorites_index)
     val baseInk = if (useDarkIdleInk) MistColors.DeepCharcoal else MistColors.OffWhite
     val activePillColor = if (useDarkIdleInk) Color(0x28171719) else Color(0x36FFFFFF)
+    val entryCount = entries.size.toFloat()
 
     entries.forEachIndexed { index, key ->
       val isAvailable = when (key) {
         FAVORITES_INDEX_KEY -> hasFavorites
         else -> key in availableSections
       }
-      val entryCount = entries.size.toFloat()
 
       Box(
         modifier = Modifier
-          .size(width = 26.dp, height = 18.dp)
+          .weight(1f)
+          .fillMaxWidth()
+          .testTag("${railTag}_key_$key")
           .graphicsLayer {
             val w = waveStrengthProvider()
             val py = pointerYProvider()
             val h = railHeightProvider()
             if (w > 0.001f && py >= 0f && h > 0f) {
-              val letterCenterY = ((index + 0.5f) / entryCount) * h
+              val usableH = (h - verticalPadPx * 2f).coerceAtLeast(1f)
+              val letterCenterY = verticalPadPx + ((index + 0.5f) / entryCount) * usableH
               val dist = abs(letterCenterY - py)
               val gaussian = exp(-(dist * dist) / (2f * sigmaPx * sigmaPx))
               translationX = dirSign * maxCurvePx * gaussian * w
@@ -355,7 +375,7 @@ private fun AlphabetLetterColumn(
           }
           .drawBehind {
             if (!invisibleMode && !isDraggingProvider() && activeKeyProvider() == key) {
-              drawCircle(color = activePillColor, radius = size.minDimension * 0.48f)
+              drawCircle(color = activePillColor, radius = (size.minDimension * 0.44f).coerceAtMost(11.dp.toPx()))
             }
           }
           .semantics {
@@ -376,7 +396,7 @@ private fun AlphabetLetterColumn(
             fontFamily = FunctionalSansFontFamily,
             fontWeight = FontWeight.Medium,
             fontSize = 10.sp,
-            lineHeight = 12.sp,
+            lineHeight = 11.sp,
             color = if (isAvailable) baseInk.copy(alpha = 0.88f) else baseInk.copy(alpha = 0.36f)
           )
         }

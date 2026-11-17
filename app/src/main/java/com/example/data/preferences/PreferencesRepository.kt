@@ -38,6 +38,7 @@ class PreferencesRepository(private val context: Context) {
     val HOME_ALPHABET_VISIBILITY = stringPreferencesKey("home_alphabet_visibility")
     val SWIPE_UP_OPENS_DRAWER = booleanPreferencesKey("swipe_up_opens_drawer")
     val SEARCH_AUTO_FOCUS_KEYBOARD = booleanPreferencesKey("search_auto_focus_keyboard")
+    val PERFORMANCE_PROFILE = stringPreferencesKey("performance_profile")
     val REDUCED_MOTION = booleanPreferencesKey("reduced_motion")
     val LOW_EFFECTS_MODE = booleanPreferencesKey("low_effects_mode")
     val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
@@ -75,6 +76,7 @@ class PreferencesRepository(private val context: Context) {
       ).let { if (it == HomeAlphabetVisibility.OFF) HomeAlphabetVisibility.VISIBLE else it },
       swipeUpOpensDrawer = false,
       searchAutoFocusKeyboard = prefs[Keys.SEARCH_AUTO_FOCUS_KEYBOARD] ?: true,
+      performanceProfile = parseEnum(prefs[Keys.PERFORMANCE_PROFILE], PerformanceProfile.ULTRA_SMOOTH),
       reducedMotion = prefs[Keys.REDUCED_MOTION] ?: false,
       lowEffectsMode = prefs[Keys.LOW_EFFECTS_MODE] ?: false,
       hapticFeedback = prefs[Keys.HAPTIC_FEEDBACK] ?: true,
@@ -168,6 +170,10 @@ class PreferencesRepository(private val context: Context) {
 
   suspend fun setSearchAutoFocusKeyboard(enabled: Boolean) {
     context.mistDataStore.edit { it[Keys.SEARCH_AUTO_FOCUS_KEYBOARD] = enabled }
+  }
+
+  suspend fun setPerformanceProfile(profile: PerformanceProfile) {
+    context.mistDataStore.edit { it[Keys.PERFORMANCE_PROFILE] = profile.name }
   }
 
   suspend fun setReducedMotion(enabled: Boolean) {

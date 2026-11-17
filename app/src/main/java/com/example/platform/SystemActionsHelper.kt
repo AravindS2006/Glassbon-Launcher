@@ -26,18 +26,7 @@ object SystemActionsHelper {
   }
 
   fun requestUninstall(context: Context, packageName: String): Boolean {
-    return try {
-      val intent = Intent(Intent.ACTION_DELETE).apply {
-        data = Uri.fromParts("package", packageName, null)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      }
-      context.startActivity(intent)
-      true
-    } catch (_: ActivityNotFoundException) {
-      openAppInfo(context, packageName)
-    } catch (_: SecurityException) {
-      openAppInfo(context, packageName)
-    }
+    return openAppInfo(context, packageName)
   }
 
   fun openDeviceSettings(context: Context): Boolean {
@@ -98,11 +87,14 @@ object SystemActionsHelper {
     return tryStartActivity(context, viewIntent)
   }
 
-  fun openAccessibilitySettings(context: Context): Boolean {
-    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+  fun openDeviceAdminLockActivation(context: Context): Boolean {
+    val adminIntent = GlassbonDeviceAdminReceiver.createEnableAdminIntent(context)
+    if (tryStartActivity(context, adminIntent)) return true
+
+    val securityIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return tryStartActivity(context, intent)
+    return tryStartActivity(context, securityIntent)
   }
 
   fun openNotificationListenerSettings(context: Context): Boolean {

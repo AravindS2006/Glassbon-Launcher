@@ -19,3 +19,9 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+-keep class com.example.MainActivity { *; }
+-keep class com.example.platform.GlassbonDeviceAdminReceiver { *; }
+-keep class com.example.platform.GlassbonMediaListenerService { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+

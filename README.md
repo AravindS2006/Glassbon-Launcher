@@ -52,9 +52,9 @@
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
 - **Dynamic Live Media Capsule**
   - Automatically expands beneath Clock/Date while music or podcasts play (and holds briefly for 12s when paused), then collapses cleanly to reclaim vertical Home space when idle.
-- **One-Tap Accessibility Screen Lock & Quick Actions**
-  - Tap the bottom-right glass Power button to lock the screen instantly via `AccessibilityService` (`GLOBAL_ACTION_LOCK_SCREEN`).
-  - Long-press it for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences**, and the **Guided Feature Tour**.
+- **One-Tap Device Admin Screen Lock & Quick Actions**
+  - Tap the bottom-right glass Power button to lock the screen instantly via Play-Protect-clean `DeviceAdminReceiver` (`force-lock` policy only).
+  - Long-press it for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (including **Ultra-Smooth** vs. **Low Power** mode), and the **Guided Feature Tour**.
 
 ---
 
@@ -112,7 +112,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-*(Optional)* Add repository secrets `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` (alias `upload`) for release-key signing; otherwise the workflow safely falls back to debug signing so automated builds never fail.
+*(Optional)* Add repository secrets `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` (alias `upload`) for signing with your release key; otherwise the workflow generates a clean release keystore and outputs an R8-minified, non-debuggable `Glassbon-*-release.apk`.
 
 ---
 

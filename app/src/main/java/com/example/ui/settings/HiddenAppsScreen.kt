@@ -135,7 +135,8 @@ fun HiddenAppsScreen(
                   app = app,
                   iconCache = iconCache,
                   iconStyle = uiState.preferences.iconStyle,
-                  tileSize = 34.dp
+                  tileSize = 34.dp,
+                  lowPowerMode = uiState.preferences.effectiveLowEffects
                 )
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(

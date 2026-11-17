@@ -121,7 +121,7 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare APK (signed Release if keystore configured, else Debug APK)
+      - name: Prepare Release APK (R8 minified & non-debuggable)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -129,18 +129,24 @@ jobs:
         run: |
           mkdir -p release-artifacts
           TAG="${{ steps.version.outputs.tag }}"
+          KEYSTORE_FILE="${{ github.workspace }}/upload-keystore.jks"
           if [[ -n "$KEYSTORE_BASE64" && -n "$STORE_PASSWORD" && -n "$KEY_PASSWORD" ]]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/upload-keystore.jks"
-            export KEYSTORE_PATH="${{ github.workspace }}/upload-keystore.jks"
-            gradle :app:assembleRelease --no-daemon
-            APK_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-            cp "$APK_SRC" "release-artifacts/Glassbon-${TAG}-release.apk"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
           else
-            echo "Signing secrets not configured; publishing debug-signed APK instead."
-            gradle :app:assembleDebug --no-daemon
-            APK_SRC=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-            cp "$APK_SRC" "release-artifacts/Glassbon-${TAG}-debug.apk"
+            echo "Signing secrets not configured; generating ephemeral release keystore for non-debuggable APK."
+            STORE_PASSWORD="glassbon-ci-release"
+            KEY_PASSWORD="glassbon-ci-release"
+            keytool -genkey -v -keystore "$KEYSTORE_FILE" \
+              -storepass "$STORE_PASSWORD" -alias upload -keypass "$KEY_PASSWORD" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Glassbon Launcher,OU=Release,O=Glassbon,C=US"
           fi
+          export KEYSTORE_PATH="$KEYSTORE_FILE"
+          export STORE_PASSWORD
+          export KEY_PASSWORD
+          gradle :app:assembleRelease --no-daemon
+          APK_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          cp "$APK_SRC" "release-artifacts/Glassbon-${TAG}-release.apk"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

@@ -166,7 +166,7 @@ fun HomeScreen(
           Spacer(modifier = Modifier.height(14.dp))
           LiquidMediaCard(
             media = uiState.activeMedia,
-            reducedMotion = prefs.reducedMotion,
+            reducedMotion = prefs.effectiveReducedMotion,
             onOpenPlayer = onOpenActiveMediaPlayer,
             onPrevious = onSkipMediaPrevious,
             onPlayPause = onToggleMediaPlayPause,
@@ -232,7 +232,8 @@ fun HomeScreen(
                 iconStyle = prefs.iconStyle,
                 tileSize = prefs.iconSize.homeTileDp.dp,
                 isPressed = isPressed,
-                reducedMotion = prefs.reducedMotion,
+                reducedMotion = prefs.effectiveReducedMotion,
+                lowPowerMode = prefs.effectiveLowEffects,
                 highContrastBackdrop = uiState.wallpaper.isMiddleBright
               )
 
@@ -273,7 +274,7 @@ fun HomeScreen(
           hapticEnabled = prefs.hapticFeedback,
           side = AlphabetRailSide.LEFT,
           invisibleMode = true,
-          reducedMotion = prefs.reducedMotion,
+          reducedMotion = prefs.effectiveReducedMotion,
           useSansBubble = useSans,
           onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.LEFT) },
           onDragEnd = onScrubDragEnd
@@ -297,7 +298,7 @@ fun HomeScreen(
         hapticEnabled = prefs.hapticFeedback,
         side = AlphabetRailSide.RIGHT,
         invisibleMode = prefs.homeAlphabetVisibility == HomeAlphabetVisibility.INVISIBLE_EDGE,
-        reducedMotion = prefs.reducedMotion,
+        reducedMotion = prefs.effectiveReducedMotion,
         useSansBubble = useSans,
         isEdgeBright = uiState.wallpaper.isEdgesBright,
         onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.RIGHT) },
@@ -398,7 +399,7 @@ fun HomeScreen(
       onClick = onPowerButtonTap,
       onLongClick = onPowerButtonLongPress,
       hapticFeedback = prefs.hapticFeedback,
-      reducedMotion = prefs.reducedMotion,
+      reducedMotion = prefs.effectiveReducedMotion,
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(end = 22.dp)

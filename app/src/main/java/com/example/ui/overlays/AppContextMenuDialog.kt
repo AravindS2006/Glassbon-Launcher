@@ -67,6 +67,7 @@ fun AppContextMenuDialog(
   iconCache: AppIconCache,
   iconStyle: IconStyle,
   reducedMotion: Boolean = false,
+  lowPowerMode: Boolean = false,
   onToggleFavorite: () -> Unit,
   onMoveFavoriteEarlier: () -> Unit,
   onMoveFavoriteLater: () -> Unit,
@@ -144,7 +145,9 @@ fun AppContextMenuDialog(
             app = app,
             iconCache = iconCache,
             iconStyle = iconStyle,
-            tileSize = 44.dp
+            tileSize = 44.dp,
+            reducedMotion = reducedMotion,
+            lowPowerMode = lowPowerMode
           )
           Spacer(modifier = Modifier.width(12.dp))
           Column(modifier = Modifier.weight(1f)) {

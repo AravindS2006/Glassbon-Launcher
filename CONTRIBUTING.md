@@ -17,9 +17,9 @@ Thank you for helping make **Glassbon** faster, cleaner, and more intentional. G
    - Follow **Kotlin + Jetpack Compose + Material 3 + MVVM** (`StateFlow` + `collectAsStateWithLifecycle`).
    - Keep composables modular and files focused.
    - Assign `Modifier.testTag("snake_case_name")` to all interactive elements, enforce minimum `48.dp` touch targets, and provide meaningful `contentDescription` strings.
-4. **Privacy First**
-   - **Never** add `INTERNET`, `READ_EXTERNAL_STORAGE`, or broad media read permissions (`PickVisualMedia` photo picker only).
-   - Keep Accessibility (`GLOBAL_ACTION_LOCK_SCREEN`) and Media Listener (`NotificationListenerService`) strictly scoped to their stated actions.
+4. **Privacy & Play-Protect Hygiene First**
+   - **Never** add `INTERNET`, `READ_EXTERNAL_STORAGE`, `REQUEST_DELETE_PACKAGES`, `BIND_ACCESSIBILITY_SERVICE`, or broad media read permissions (`PickVisualMedia` photo picker only).
+   - Keep Device Admin (`force-lock` only) and Media Listener (`NotificationListenerService`) strictly scoped to their stated actions.
 
 ---
 

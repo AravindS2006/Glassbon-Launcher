@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required on Android 9+ to invoke the system uninstall confirmation dialog from app long-press -->
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-
     <!-- Android 11+ package visibility for discovering launchable applications -->
     <queries>
         <intent>
@@ -41,19 +38,20 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility service for one-tap screen lock (GLOBAL_ACTION_LOCK_SCREEN) -->
-        <service
-            android:name=".platform.GlassbonLockAccessibilityService"
+        <!-- Scoped Device Admin receiver for one-tap screen lock (force-lock policy only) -->
+        <receiver
+            android:name=".platform.GlassbonDeviceAdminReceiver"
+            android:description="@string/device_admin_lock_description"
             android:exported="true"
-            android:label="@string/accessibility_lock_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
+            android:label="@string/device_admin_lock_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/glassbon_accessibility_service" />
-        </service>
+                android:name="android.app.device_admin"
+                android:resource="@xml/glassbon_device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Notification listener service for observing active MediaSession playback -->
         <service

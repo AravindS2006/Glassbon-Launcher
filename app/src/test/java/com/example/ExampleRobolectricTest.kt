@@ -5,9 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
-import com.example.platform.GlassbonLockAccessibilityService
+import com.example.platform.GlassbonDeviceAdminReceiver
 import com.example.platform.GlassbonMediaListenerService
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,7 +21,7 @@ import org.robolectric.annotation.Config
 class ExampleRobolectricTest {
 
   @Test
-  fun `read app name verify HOME intent filter and platform services`() {
+  fun `read app name verify HOME intent filter and Play-Protect-safe platform components`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
     assertEquals("Glassbon", appName)
@@ -35,16 +36,23 @@ class ExampleRobolectricTest {
     )
     assertTrue(matches.any { it.activityInfo.packageName == context.packageName })
 
-    val lockServiceInfo = context.packageManager.getServiceInfo(
-      ComponentName(context, GlassbonLockAccessibilityService::class.java),
+    val adminReceiverInfo = context.packageManager.getReceiverInfo(
+      ComponentName(context, GlassbonDeviceAdminReceiver::class.java),
       PackageManager.GET_META_DATA
     )
-    assertNotNull(lockServiceInfo)
+    assertNotNull(adminReceiverInfo)
 
     val mediaServiceInfo = context.packageManager.getServiceInfo(
       ComponentName(context, GlassbonMediaListenerService::class.java),
       PackageManager.GET_META_DATA
     )
     assertNotNull(mediaServiceInfo)
+
+    val pkgInfo = context.packageManager.getPackageInfo(
+      context.packageName,
+      PackageManager.GET_PERMISSIONS
+    )
+    val requested = pkgInfo.requestedPermissions?.toList().orEmpty()
+    assertFalse(requested.contains(android.Manifest.permission.REQUEST_DELETE_PACKAGES))
   }
 }

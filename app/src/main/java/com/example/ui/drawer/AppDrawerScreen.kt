@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -96,8 +97,10 @@ import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
+import androidx.compose.runtime.snapshotFlow
 import com.example.ui.theme.appLabelTextStyle
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -133,13 +136,16 @@ fun AppDrawerScreen(
     else -> draggingSide
   }
 
-  LaunchedEffect(effectiveSide, prefs.reducedMotion) {
+  val effectiveReducedMotion = prefs.effectiveReducedMotion
+  val effectiveLowEffects = prefs.effectiveLowEffects
+
+  LaunchedEffect(effectiveSide, effectiveReducedMotion) {
     val targetShift = when {
-      prefs.reducedMotion || effectiveSide == null -> 0f
+      effectiveReducedMotion || effectiveSide == null -> 0f
       effectiveSide == AlphabetRailSide.RIGHT -> -dragPullPx
       else -> dragPullPx
     }
-    if (prefs.reducedMotion) {
+    if (effectiveReducedMotion) {
       listDragShiftX.snapTo(0f)
     } else {
       listDragShiftX.animateTo(
@@ -163,13 +169,30 @@ fun AppDrawerScreen(
   }
 
   val sectionIndexMap = uiState.sectionIndexMap
+  var pinnedJumpKey by remember { mutableStateOf<String?>(null) }
 
-  // Initial jump when opening the drawer from Home screen's Alphabet Rail
-  LaunchedEffect(uiState.drawerJumpTarget, sectionIndexMap) {
+  // Clear pinned section highlight as soon as user manually drags the app list
+  LaunchedEffect(listState) {
+    listState.interactionSource.interactions.collect { interaction ->
+      if (interaction is DragInteraction.Start) {
+        pinnedJumpKey = null
+      }
+    }
+  }
+
+  // Initial jump when opening the drawer from Home screen's Alphabet Rail:
+  // Wait for LazyColumn's initial measurement pass if cold-opening so scrollToItem never drops.
+  LaunchedEffect(uiState.drawerJumpTarget, sectionIndexMap, uiState.drawerRows.size) {
     val target = uiState.drawerJumpTarget ?: return@LaunchedEffect
-    val index = findNearestSectionIndex(target, sectionIndexMap)
-    if (index != null) {
-      listState.scrollToItem(index)
+    val resolved = findNearestSection(target, sectionIndexMap)
+    if (resolved != null && resolved.second < uiState.drawerRows.size) {
+      val index = resolved.second
+      if (listState.layoutInfo.totalItemsCount <= index) {
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+          .first { it > index }
+      }
+      pinnedJumpKey = resolved.first
+      listState.scrollToItem(index, scrollOffset = 0)
     }
     onJumpTargetHandled()
   }
@@ -177,9 +200,10 @@ fun AppDrawerScreen(
   // Imperative continuous scrub jumps while dragging from Home's Alphabet Rail (0 recompositions!)
   LaunchedEffect(drawerJumpEvents, sectionIndexMap) {
     drawerJumpEvents.collect { target ->
-      val index = findNearestSectionIndex(target, sectionIndexMap)
-      if (index != null) {
-        listState.scrollToItem(index)
+      val resolved = findNearestSection(target, sectionIndexMap)
+      if (resolved != null) {
+        pinnedJumpKey = resolved.first
+        listState.scrollToItem(resolved.second, scrollOffset = 0)
       }
     }
   }
@@ -187,21 +211,26 @@ fun AppDrawerScreen(
   // Only read inside activeKeyProvider lambda passed to AlphabetRail -> AppDrawerScreen NEVER recomposes while scrolling!
   val activeIndexKeyState = remember(sectionIndexMap) {
     derivedStateOf {
-      val layoutInfo = listState.layoutInfo
-      val visibleItems = layoutInfo.visibleItemsInfo
-      if (visibleItems.isNotEmpty() && !listState.canScrollForward) {
-        sectionIndexMap.keys.lastOrNull()
+      val pinned = pinnedJumpKey
+      if (pinned != null && pinned in sectionIndexMap) {
+        pinned
       } else {
-        val firstVisible = listState.firstVisibleItemIndex
-        var current: String? = null
-        for ((key, startIndex) in sectionIndexMap) {
-          if (startIndex <= firstVisible) {
-            current = key
-          } else {
-            break
+        val layoutInfo = listState.layoutInfo
+        val visibleItems = layoutInfo.visibleItemsInfo
+        if (visibleItems.isNotEmpty() && !listState.canScrollForward && listState.canScrollBackward) {
+          sectionIndexMap.keys.lastOrNull()
+        } else {
+          val firstVisible = listState.firstVisibleItemIndex
+          var current: String? = null
+          for ((key, startIndex) in sectionIndexMap) {
+            if (startIndex <= firstVisible) {
+              current = key
+            } else {
+              break
+            }
           }
+          current ?: sectionIndexMap.keys.firstOrNull()
         }
-        current ?: sectionIndexMap.keys.firstOrNull()
       }
     }
   }
@@ -323,10 +352,14 @@ fun AppDrawerScreen(
                   DrawerSectionHeader(
                     title = if (rowItem.isFavoritesHeader) favoritesTitle else rowItem.title,
                     useSans = useSans || rowItem.isFavoritesHeader,
-                    modifier = Modifier.padding(
-                      top = if (rowItem.isFavoritesHeader) 8.dp else 20.dp,
-                      bottom = 6.dp
-                    )
+                    modifier = Modifier
+                      .padding(
+                        top = if (rowItem.isFavoritesHeader) 8.dp else 20.dp,
+                        bottom = 6.dp
+                      )
+                      .testTag(
+                        if (rowItem.isFavoritesHeader) "drawer_section_favorites" else "drawer_section_${rowItem.title}"
+                      )
                   )
                 }
                 is DrawerRowItem.App -> {
@@ -339,7 +372,8 @@ fun AppDrawerScreen(
                     isItalic = isItalic,
                     useSans = useSans,
                     hapticFeedback = prefs.hapticFeedback,
-                    reducedMotion = prefs.reducedMotion,
+                    reducedMotion = effectiveReducedMotion,
+                    lowPowerMode = effectiveLowEffects,
                     onClick = { onLaunchApp(app) },
                     onLongClick = { onLongPressApp(app) }
                   )
@@ -364,15 +398,16 @@ fun AppDrawerScreen(
                 hapticEnabled = prefs.hapticFeedback,
                 side = AlphabetRailSide.LEFT,
                 invisibleMode = true,
-                reducedMotion = prefs.reducedMotion,
+                reducedMotion = effectiveReducedMotion,
                 useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.LEFT else null
                 },
                 onSelectKey = { targetKey ->
-                  val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
-                  if (targetIndex != null) {
-                    coroutineScope.launch { listState.scrollToItem(targetIndex) }
+                  val resolved = findNearestSection(targetKey, sectionIndexMap)
+                  if (resolved != null) {
+                    pinnedJumpKey = resolved.first
+                    coroutineScope.launch { listState.scrollToItem(resolved.second, scrollOffset = 0) }
                   }
                 }
               )
@@ -394,15 +429,16 @@ fun AppDrawerScreen(
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 side = AlphabetRailSide.RIGHT,
-                reducedMotion = prefs.reducedMotion,
+                reducedMotion = effectiveReducedMotion,
                 useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.RIGHT else null
                 },
                 onSelectKey = { targetKey ->
-                  val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
-                  if (targetIndex != null) {
-                    coroutineScope.launch { listState.scrollToItem(targetIndex) }
+                  val resolved = findNearestSection(targetKey, sectionIndexMap)
+                  if (resolved != null) {
+                    pinnedJumpKey = resolved.first
+                    coroutineScope.launch { listState.scrollToItem(resolved.second, scrollOffset = 0) }
                   }
                 }
               )
@@ -419,7 +455,7 @@ fun AppDrawerScreen(
         testTag = "drawer_search_button",
         onClick = { onSearchActiveChange(true) },
         hapticFeedback = prefs.hapticFeedback,
-        reducedMotion = prefs.reducedMotion,
+        reducedMotion = effectiveReducedMotion,
         modifier = Modifier
           .align(Alignment.BottomEnd)
           .padding(end = 24.dp, bottom = 20.dp)
@@ -428,21 +464,23 @@ fun AppDrawerScreen(
   }
 }
 
-private fun findNearestSectionIndex(
+private fun findNearestSection(
   targetKey: String,
   sectionIndexMap: Map<String, Int>
-): Int? {
-  sectionIndexMap[targetKey]?.let { return it }
+): Pair<String, Int>? {
+  sectionIndexMap[targetKey]?.let { return targetKey to it }
   if (targetKey == FAVORITES_INDEX_KEY) {
-    return sectionIndexMap.values.firstOrNull()
+    val first = sectionIndexMap.entries.firstOrNull() ?: return null
+    return first.key to first.value
   }
   val keys = sectionIndexMap.keys.filter { it != FAVORITES_INDEX_KEY }
   if (targetKey == "#") {
-    return keys.lastOrNull()?.let { sectionIndexMap[it] }
+    val lastKey = keys.lastOrNull() ?: return null
+    return sectionIndexMap[lastKey]?.let { lastKey to it }
   }
   val exactOrNext = keys.firstOrNull { it != "#" && it >= targetKey }
     ?: keys.lastOrNull()
-  return exactOrNext?.let { sectionIndexMap[it] }
+  return exactOrNext?.let { key -> sectionIndexMap[key]?.let { key to it } }
 }
 
 @Composable
@@ -472,6 +510,7 @@ private fun DrawerAppRow(
   useSans: Boolean,
   hapticFeedback: Boolean,
   reducedMotion: Boolean,
+  lowPowerMode: Boolean,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
   modifier: Modifier = Modifier
@@ -505,7 +544,8 @@ private fun DrawerAppRow(
       iconStyle = iconStyle,
       tileSize = tileSize,
       isPressed = isPressed,
-      reducedMotion = reducedMotion
+      reducedMotion = reducedMotion,
+      lowPowerMode = lowPowerMode
     )
 
     Spacer(modifier = Modifier.width(16.dp))
@@ -682,7 +722,8 @@ private fun SearchResultsList(
           isItalic = isItalic,
           useSans = useSans,
           hapticFeedback = prefs.hapticFeedback,
-          reducedMotion = prefs.reducedMotion,
+          reducedMotion = prefs.effectiveReducedMotion,
+          lowPowerMode = prefs.effectiveLowEffects,
           onClick = { onLaunchApp(app) },
           onLongClick = { onLongPressApp(app) }
         )

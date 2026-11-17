@@ -32,6 +32,11 @@ enum class QuickActionMode(val displayName: String) {
   DIRECT_LIBRARY("Open App Library")
 }
 
+enum class PerformanceProfile(val displayName: String) {
+  ULTRA_SMOOTH("Ultra-Smooth"),
+  POWER_SAVER("Low Power")
+}
+
 @Immutable
 data class LauncherPreferences(
   val favoriteKeys: List<String> = emptyList(),
@@ -52,6 +57,7 @@ data class LauncherPreferences(
   val homeAlphabetVisibility: HomeAlphabetVisibility = HomeAlphabetVisibility.VISIBLE,
   val swipeUpOpensDrawer: Boolean = false,
   val searchAutoFocusKeyboard: Boolean = true,
+  val performanceProfile: PerformanceProfile = PerformanceProfile.ULTRA_SMOOTH,
   val reducedMotion: Boolean = false,
   val lowEffectsMode: Boolean = false,
   val hapticFeedback: Boolean = true,
@@ -59,4 +65,13 @@ data class LauncherPreferences(
   val onboardingDismissed: Boolean = false,
   val walkthroughCompleted: Boolean = false,
   val favoritesSeeded: Boolean = false
-)
+) {
+  val isPowerSaver: Boolean
+    get() = performanceProfile == PerformanceProfile.POWER_SAVER
+
+  val effectiveReducedMotion: Boolean
+    get() = reducedMotion || isPowerSaver
+
+  val effectiveLowEffects: Boolean
+    get() = lowEffectsMode || isPowerSaver
+}

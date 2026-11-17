@@ -41,6 +41,7 @@ fun MistAppIcon(
   modifier: Modifier = Modifier,
   isPressed: Boolean = false,
   reducedMotion: Boolean = false,
+  lowPowerMode: Boolean = false,
   highContrastBackdrop: Boolean = false
 ) {
   val cached = iconCache.getCached(app.componentKey, iconStyle)
@@ -59,26 +60,44 @@ fun MistAppIcon(
     if (isGlassMono) null else RoundedCornerShape((tileSize.value * 0.30f).dp)
   }
 
-  // Single-pass squircle fill + top sheen + specular rim with zero offscreen clip() layers for DOT_MONO
+  // In Ultra-Smooth: single-pass frosted squircle + inner sheen + specular rim.
+  // In Low Power: minimal solid squircle + thin hairline stroke (zero gradient passes).
   val tileModifier = if (isGlassMono) {
-    val fillBrush = if (highContrastBackdrop) TILE_FILL_CONTRAST_BRUSH else TILE_FILL_BRUSH
-    Modifier.drawBehind {
-      val radius = size.width * 0.30f
-      val corner = CornerRadius(radius, radius)
-      drawRoundRect(
-        brush = fillBrush,
-        cornerRadius = corner
-      )
-      drawRoundRect(
-        brush = INNER_SHEEN_BRUSH,
-        size = Size(size.width, size.height * 0.42f),
-        cornerRadius = corner
-      )
-      drawRoundRect(
-        brush = RIM_HIGHLIGHT_BRUSH,
-        cornerRadius = corner,
-        style = Stroke(width = 0.85.dp.toPx())
-      )
+    if (lowPowerMode) {
+      val flatColor = if (highContrastBackdrop) Color(0xD215161A) else MistColors.IconTileFillBottom
+      Modifier.drawBehind {
+        val radius = size.width * 0.30f
+        val corner = CornerRadius(radius, radius)
+        drawRoundRect(
+          color = flatColor,
+          cornerRadius = corner
+        )
+        drawRoundRect(
+          color = MistColors.FrostedPanelBorder,
+          cornerRadius = corner,
+          style = Stroke(width = 0.75.dp.toPx())
+        )
+      }
+    } else {
+      val fillBrush = if (highContrastBackdrop) TILE_FILL_CONTRAST_BRUSH else TILE_FILL_BRUSH
+      Modifier.drawBehind {
+        val radius = size.width * 0.30f
+        val corner = CornerRadius(radius, radius)
+        drawRoundRect(
+          brush = fillBrush,
+          cornerRadius = corner
+        )
+        drawRoundRect(
+          brush = INNER_SHEEN_BRUSH,
+          size = Size(size.width, size.height * 0.42f),
+          cornerRadius = corner
+        )
+        drawRoundRect(
+          brush = RIM_HIGHLIGHT_BRUSH,
+          cornerRadius = corner,
+          style = Stroke(width = 0.85.dp.toPx())
+        )
+      }
     }
   } else {
     Modifier.clip(originalShape!!)
