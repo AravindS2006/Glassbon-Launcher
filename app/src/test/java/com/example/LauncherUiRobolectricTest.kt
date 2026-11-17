@@ -1,10 +1,12 @@
 package com.example
 
 import android.provider.Settings
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -95,13 +97,24 @@ class LauncherUiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
 
-    // Hidden left-edge alphabet rail opens drawer, and swiping down inside the drawer returns to Home
+    // Hidden left-edge alphabet rail opens drawer with zero duplicate right-side alphabet rails (<= 1, never 2!)
     composeTestRule.onNodeWithTag("home_left_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("left_alphabet_rail").performTouchInput {
-      click(centerLeft)
+      down(centerLeft)
+      moveBy(androidx.compose.ui.geometry.Offset(40f, 60f))
     }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("app_drawer_screen").assertIsDisplayed()
+    org.junit.Assert.assertTrue(
+      composeTestRule.onAllNodesWithTag("alphabet_rail").fetchSemanticsNodes().size <= 1
+    )
+    composeTestRule.onNodeWithTag("left_alphabet_rail").performTouchInput {
+      up()
+    }
+    composeTestRule.waitForIdle()
+    org.junit.Assert.assertTrue(
+      composeTestRule.onAllNodesWithTag("alphabet_rail").fetchSemanticsNodes().size <= 1
+    )
     composeTestRule.onNodeWithTag("drawer_app_list").performTouchInput {
       swipeDown()
     }

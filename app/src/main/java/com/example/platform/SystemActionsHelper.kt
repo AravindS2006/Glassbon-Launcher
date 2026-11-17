@@ -47,9 +47,12 @@ object SystemActionsHelper {
       Settings.ACTION_DISPLAY_SETTINGS,
       Settings.ACTION_SETTINGS
     )
+    val needsNewTask = context !is android.app.Activity
     for (action in candidates) {
       val intent = Intent(action).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (needsNewTask) {
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
       }
       if (tryStartActivity(context, intent)) return true
     }

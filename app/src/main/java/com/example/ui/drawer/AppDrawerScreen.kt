@@ -115,6 +115,7 @@ import com.example.ui.theme.appLabelTextStyle
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -146,12 +147,12 @@ fun AppDrawerScreen(
   val keyboardController = LocalSoftwareKeyboardController.current
   val density = LocalDensity.current
 
-  // Smooth elastic horizontal glide away from the active thumb edge synced with sideways pull
+  // Smooth horizontal clearance ONLY for left-edge wave (never push apps off the left edge of the screen!)
   var draggingSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
   val drawerScrubPullState = remember { mutableFloatStateOf(0f) }
   val listDragShiftX = remember { Animatable(0f) }
-  val baseShiftPx = with(density) { 14.dp.toPx() }
-  val extraShiftPx = with(density) { 26.dp.toPx() }
+  val baseLeftClearancePx = with(density) { 10.dp.toPx() }
+  val extraLeftClearancePx = with(density) { 14.dp.toPx() }
   val defaultRowHeightPx = with(density) { 56.dp.toPx() }
 
   val effectiveSide = when {
@@ -279,10 +280,10 @@ fun AppDrawerScreen(
   }
 
   LaunchedEffect(effectiveSide, effectiveReducedMotion) {
-    if (effectiveReducedMotion || effectiveSide == null) {
+    if (effectiveReducedMotion || effectiveSide == null || effectiveSide == AlphabetRailSide.RIGHT) {
       if (effectiveReducedMotion) {
         listDragShiftX.snapTo(0f)
-      } else {
+      } else if (listDragShiftX.value != 0f) {
         listDragShiftX.animateTo(
           targetValue = 0f,
           animationSpec = spring(
@@ -292,14 +293,13 @@ fun AppDrawerScreen(
         )
       }
     } else {
-      val dirSign = if (effectiveSide == AlphabetRailSide.RIGHT) -1f else 1f
       snapshotFlow {
-        val pull = if (hideRightAlphabetRail || hideLeftAlphabetRail) {
+        val pull = if (hideLeftAlphabetRail) {
           homeScrubPullProvider()
         } else {
           drawerScrubPullState.floatValue
         }
-        dirSign * (baseShiftPx + extraShiftPx * pull)
+        baseLeftClearancePx + extraLeftClearancePx * pull
       }.collect { targetShift ->
         listDragShiftX.animateTo(
           targetValue = targetShift,
@@ -381,30 +381,45 @@ fun AppDrawerScreen(
     }
   }
 
-  // Vsync-paced frame follower: smoothly interpolates LazyColumn item + pixel offset at 60-120Hz while dragging
-  LaunchedEffect(isScrubbingAnyEdge, effectiveReducedMotion, uiState.drawerRows.size) {
-    if (!isScrubbingAnyEdge || uiState.drawerRows.isEmpty()) return@LaunchedEffect
+  // Vsync-paced frame follower: smoothly interpolates LazyColumn item + pixel offset at 60-120Hz and finishes settling cleanly even after finger release
+  LaunchedEffect(effectiveReducedMotion, uiState.drawerRows.size) {
+    if (uiState.drawerRows.isEmpty()) return@LaunchedEffect
 
     var smoothedRow = -1f
-    var lastFrameNanos = 0L
+    val maxRow = (uiState.drawerRows.size - 1).coerceAtLeast(0).toFloat()
 
-    while (true) {
-      var pendingScroll: Pair<Int, Int>? = null
-      withFrameNanos { frameNanos ->
-        val target = targetContinuousRowState.floatValue
-        if (target >= 0f) {
+    snapshotFlow { targetContinuousRowState.floatValue }
+      .collectLatest { target ->
+        if (target < 0f) {
+          smoothedRow = -1f
+          return@collectLatest
+        }
+        val clampedTarget = target.coerceIn(0f, maxRow)
+
+        if (effectiveReducedMotion) {
+          smoothedRow = clampedTarget
+          val itemIndex = clampedTarget.toInt().coerceIn(0, uiState.drawerRows.lastIndex)
           val visibleInfo = listState.layoutInfo.visibleItemsInfo
           val avgRowPx = if (visibleInfo.isNotEmpty()) {
             (visibleInfo.sumOf { it.size }.toFloat() / visibleInfo.size).coerceAtLeast(1f)
           } else {
             defaultRowHeightPx
           }
-          val maxRow = (uiState.drawerRows.size - 1).coerceAtLeast(0).toFloat()
-          val clampedTarget = target.coerceIn(0f, maxRow)
+          val offsetPx = ((clampedTarget - itemIndex) * avgRowPx).roundToInt().coerceAtLeast(0)
+          listState.scrollToItem(itemIndex, offsetPx)
+          return@collectLatest
+        }
 
-          if (effectiveReducedMotion) {
-            smoothedRow = clampedTarget
-          } else {
+        var lastFrameNanos = 0L
+        while (smoothedRow < 0f || abs(clampedTarget - smoothedRow) > 0.005f) {
+          var pendingScroll: Pair<Int, Int>? = null
+          withFrameNanos { frameNanos ->
+            val visibleInfo = listState.layoutInfo.visibleItemsInfo
+            val avgRowPx = if (visibleInfo.isNotEmpty()) {
+              (visibleInfo.sumOf { it.size }.toFloat() / visibleInfo.size).coerceAtLeast(1f)
+            } else {
+              defaultRowHeightPx
+            }
             if (smoothedRow < 0f) {
               smoothedRow = (listState.firstVisibleItemIndex +
                 (listState.firstVisibleItemScrollOffset / avgRowPx)).coerceIn(0f, maxRow)
@@ -414,23 +429,20 @@ fun AppDrawerScreen(
             }
             val factor = 1f - exp(-26f * dt)
             smoothedRow += (clampedTarget - smoothedRow) * factor
-            if (abs(clampedTarget - smoothedRow) < 0.005f) {
+            if (abs(clampedTarget - smoothedRow) <= 0.005f) {
               smoothedRow = clampedTarget
             }
-          }
-          lastFrameNanos = frameNanos
+            lastFrameNanos = frameNanos
 
-          val itemIndex = smoothedRow.toInt().coerceIn(0, uiState.drawerRows.lastIndex)
-          val offsetPx = ((smoothedRow - itemIndex) * avgRowPx).roundToInt().coerceAtLeast(0)
-          pendingScroll = itemIndex to offsetPx
-        } else {
-          lastFrameNanos = frameNanos
+            val itemIndex = smoothedRow.toInt().coerceIn(0, uiState.drawerRows.lastIndex)
+            val offsetPx = ((smoothedRow - itemIndex) * avgRowPx).roundToInt().coerceAtLeast(0)
+            pendingScroll = itemIndex to offsetPx
+          }
+          pendingScroll?.let { (itemIndex, offsetPx) ->
+            listState.scrollToItem(itemIndex, offsetPx)
+          }
         }
       }
-      pendingScroll?.let { (itemIndex, offsetPx) ->
-        listState.scrollToItem(itemIndex, offsetPx)
-      }
-    }
   }
 
   // Only read inside activeKeyProvider lambda passed to AlphabetRail -> AppDrawerScreen NEVER recomposes while scrolling!

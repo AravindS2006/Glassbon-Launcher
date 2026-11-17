@@ -29,6 +29,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -54,6 +56,7 @@ import com.example.data.apps.AppIndexHelper
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.hypot
@@ -92,6 +95,7 @@ fun AlphabetRail(
   var isDragging by remember { mutableStateOf(false) }
   var isWaveVisible by remember(invisibleMode) { mutableStateOf(!invisibleMode) }
   val pointerYState = remember { mutableFloatStateOf(-1f) }
+  val smoothedPointerYState = remember { mutableFloatStateOf(-1f) }
   val dragPullTargetState = remember { mutableFloatStateOf(0f) }
   var lastSelectedIndex by remember { mutableIntStateOf(-1) }
   val scrubbedKeyState = remember { mutableStateOf<String?>(null) }
@@ -129,34 +133,77 @@ fun AlphabetRail(
     }
   }
 
-  // Smooth elastic sideways pull damper for the wave arc (follows horizontal thumb drag smoothly)
-  LaunchedEffect(isDragging, dragPullTargetState.floatValue, reducedMotion) {
-    val target = if (isDragging) dragPullTargetState.floatValue else 0f
-    if (reducedMotion) {
-      dragStretch.snapTo(target)
+  // Vsync-paced sideways stretch & vertical wave follower (settles cleanly with 0 idle frame churn)
+  LaunchedEffect(isDragging, reducedMotion) {
+    if (isDragging) {
+      snapshotFlow { pointerYState.floatValue to dragPullTargetState.floatValue }
+        .collectLatest { (targetY, targetPull) ->
+          if (reducedMotion) {
+            if (targetY >= 0f) smoothedPointerYState.floatValue = targetY
+            dragStretch.snapTo(targetPull)
+            return@collectLatest
+          }
+          var lastFrameNanos = 0L
+          while (
+            (targetY >= 0f && (smoothedPointerYState.floatValue < 0f || abs(targetY - smoothedPointerYState.floatValue) > 0.35f)) ||
+            abs(targetPull - dragStretch.value) > 0.002f
+          ) {
+            var nextStretch = dragStretch.value
+            withFrameNanos { frameNanos ->
+              val dt = if (lastFrameNanos == 0L) 0.016f else {
+                ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
+              }
+              val factor = 1f - exp(-26f * dt)
+              if (targetY >= 0f) {
+                val curY = smoothedPointerYState.floatValue
+                smoothedPointerYState.floatValue = if (curY < 0f || abs(targetY - curY) <= 0.35f) {
+                  targetY
+                } else {
+                  curY + (targetY - curY) * factor
+                }
+              }
+              val curStretch = dragStretch.value
+              val diffStretch = targetPull - curStretch
+              nextStretch = if (abs(diffStretch) <= 0.002f) {
+                targetPull
+              } else {
+                curStretch + diffStretch * factor
+              }
+              lastFrameNanos = frameNanos
+            }
+            dragStretch.snapTo(nextStretch)
+          }
+          if (targetY >= 0f) smoothedPointerYState.floatValue = targetY
+          dragStretch.snapTo(targetPull)
+        }
     } else {
-      dragStretch.animateTo(
-        targetValue = target,
-        animationSpec = spring(
-          dampingRatio = 0.72f,
-          stiffness = Spring.StiffnessMedium
+      if (reducedMotion) {
+        dragStretch.snapTo(0f)
+        smoothedPointerYState.floatValue = pointerYState.floatValue
+      } else if (dragStretch.value > 0f) {
+        dragStretch.animateTo(
+          targetValue = 0f,
+          animationSpec = spring(
+            dampingRatio = 0.76f,
+            stiffness = Spring.StiffnessMedium
+          )
         )
-      )
+      }
     }
   }
 
   val isLeft = side == AlphabetRailSide.LEFT
   val dirSign = if (isLeft) 1f else -1f
   val verticalPadPx = with(density) { 4.dp.toPx() }
-  val baseCurvePx = with(density) { 42.dp.toPx() }
-  val extraCurvePx = with(density) { 52.dp.toPx() }
+  val baseCurvePx = with(density) { 36.dp.toPx() }
+  val extraCurvePx = with(density) { 46.dp.toPx() }
   val baseSigmaPx = with(density) { 54.dp.toPx() }
-  val extraSigmaPx = with(density) { 26.dp.toPx() }
-  val maxPullInputPx = with(density) { 96.dp.toPx() }
+  val extraSigmaPx = with(density) { 24.dp.toPx() }
+  val maxPullInputPx = with(density) { 80.dp.toPx() }
   val bubbleHalfSizePx = with(density) { 27.dp.toPx() }
   val bubbleBaseOffsetXPx = with(density) { 74.dp.roundToPx() }
-  val bubbleSwingXPx = with(density) { 20.dp.toPx() }
-  val bubbleStretchXPx = with(density) { 46.dp.toPx() }
+  val bubbleSwingXPx = with(density) { 18.dp.toPx() }
+  val bubbleStretchXPx = with(density) { 42.dp.toPx() }
 
   fun dispatchContinuousForY(y: Float, emitSelect: Boolean, emitContinuous: Boolean) {
     val heightPx = railHeightPxState.intValue
@@ -215,6 +262,7 @@ fun AlphabetRail(
             isDragging = true
             isWaveVisible = true
             dragPullTargetState.floatValue = 0f
+            smoothedPointerYState.floatValue = downY.coerceIn(verticalPadPx, (railHeightPxState.intValue - verticalPadPx).coerceAtLeast(verticalPadPx))
             onDragPullChanged(0f)
             dispatchContinuousForY(downY, emitSelect = true, emitContinuous = false)
 
@@ -263,7 +311,7 @@ fun AlphabetRail(
         bubbleKeyProvider = { scrubbedKeyState.value ?: activeKeyProvider() },
         waveStrengthProvider = { waveStrength.value },
         dragStretchProvider = { dragStretch.value },
-        pointerYProvider = { pointerYState.floatValue },
+        pointerYProvider = { smoothedPointerYState.floatValue.takeIf { it >= 0f } ?: pointerYState.floatValue },
         railHeightProvider = { railHeightPxState.intValue.toFloat() },
         dirSign = dirSign,
         bubbleHalfSizePx = bubbleHalfSizePx,
@@ -291,7 +339,7 @@ fun AlphabetRail(
         isDraggingProvider = { isDragging },
         waveStrengthProvider = { waveStrength.value },
         dragStretchProvider = { dragStretch.value },
-        pointerYProvider = { pointerYState.floatValue },
+        pointerYProvider = { smoothedPointerYState.floatValue.takeIf { it >= 0f } ?: pointerYState.floatValue },
         railHeightProvider = { railHeightPxState.intValue.toFloat() },
         modifier = Modifier
           .align(containerAlign)

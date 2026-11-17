@@ -79,6 +79,7 @@ fun HomeScreen(
   clockSnapshot: ClockSnapshot,
   iconCache: AppIconCache,
   drawerProgressProvider: () -> Float,
+  activeHomeScrubSide: AlphabetRailSide? = null,
   onScrubToDrawerSection: (String, AlphabetRailSide) -> Unit,
   onScrubPullChanged: (Float) -> Unit = {},
   onContinuousScrub: ((Float) -> Unit)? = null,
@@ -259,8 +260,10 @@ fun HomeScreen(
       }
     }
 
-    // Left-edge hidden mirrored curved Alphabet Rail (0% idle draw cost; wakes on left-thumb drag)
-    if (prefs.showLeftHiddenAlphabet) {
+    // Left-edge hidden mirrored curved Alphabet Rail (0% idle draw cost; hidden once drawer opens unless actively dragging left edge)
+    val showHomeLeftRail = prefs.showLeftHiddenAlphabet &&
+      (!uiState.isDrawerOpen || activeHomeScrubSide == AlphabetRailSide.LEFT)
+    if (showHomeLeftRail) {
       Box(
         modifier = Modifier
           .align(Alignment.CenterStart)
@@ -286,30 +289,33 @@ fun HomeScreen(
       }
     }
 
-    // Right-edge curved Alphabet Rail
-    Box(
-      modifier = Modifier
-        .align(Alignment.CenterEnd)
-        .fillMaxHeight()
-        .padding(top = 52.dp, bottom = 78.dp, end = 6.dp)
-        .testTag("home_alphabet_rail_container"),
-      contentAlignment = Alignment.CenterEnd
-    ) {
-      AlphabetRail(
-        availableSections = availableSections,
-        activeKeyProvider = { null },
-        hasFavorites = uiState.favoriteApps.isNotEmpty(),
-        hapticEnabled = prefs.hapticFeedback,
-        side = AlphabetRailSide.RIGHT,
-        invisibleMode = prefs.homeAlphabetVisibility == HomeAlphabetVisibility.INVISIBLE_EDGE,
-        reducedMotion = prefs.effectiveReducedMotion,
-        useSansBubble = useSans,
-        isEdgeBright = uiState.wallpaper.isEdgesBright,
-        onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.RIGHT) },
-        onDragPullChanged = onScrubPullChanged,
-        onContinuousScrub = onContinuousScrub,
-        onDragEnd = onScrubDragEnd
-      )
+    // Right-edge curved Alphabet Rail (strict mutual exclusion with AppDrawerScreen's right rail -> never 2 rails!)
+    val showHomeRightRail = !uiState.isDrawerOpen || activeHomeScrubSide == AlphabetRailSide.RIGHT
+    if (showHomeRightRail) {
+      Box(
+        modifier = Modifier
+          .align(Alignment.CenterEnd)
+          .fillMaxHeight()
+          .padding(top = 52.dp, bottom = 78.dp, end = 6.dp)
+          .testTag("home_alphabet_rail_container"),
+        contentAlignment = Alignment.CenterEnd
+      ) {
+        AlphabetRail(
+          availableSections = availableSections,
+          activeKeyProvider = { null },
+          hasFavorites = uiState.favoriteApps.isNotEmpty(),
+          hapticEnabled = prefs.hapticFeedback,
+          side = AlphabetRailSide.RIGHT,
+          invisibleMode = prefs.homeAlphabetVisibility == HomeAlphabetVisibility.INVISIBLE_EDGE,
+          reducedMotion = prefs.effectiveReducedMotion,
+          useSansBubble = useSans,
+          isEdgeBright = uiState.wallpaper.isEdgesBright,
+          onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.RIGHT) },
+          onDragPullChanged = onScrubPullChanged,
+          onContinuousScrub = onContinuousScrub,
+          onDragEnd = onScrubDragEnd
+        )
+      }
     }
 
     // Subtle first-run onboarding & tour pill (leaves edges and power button unobstructed)

@@ -216,6 +216,7 @@ fun LauncherRoot(
         clockSnapshot = clockSnapshot,
         iconCache = iconCache,
         drawerProgressProvider = { drawerProgressState.value },
+        activeHomeScrubSide = activeHomeScrubSide,
         onScrubToDrawerSection = { key, side ->
           activeHomeScrubSide = side
           if (uiState.isDrawerOpen) {
@@ -480,11 +481,11 @@ private fun AmbientCalmOverlay(
         Spacer(modifier = Modifier.height(6.dp))
       }
       Text(
-        text = "Tap anywhere to return",
+        text = "OLED Calm Lock · Tap anywhere to return",
         fontFamily = FunctionalSansFontFamily,
         fontSize = 12.sp,
         letterSpacing = 0.6.sp,
-        color = Color(0x24FFFFFF)
+        color = Color(0x42FFFFFF)
       )
     }
 
@@ -505,8 +506,8 @@ private fun AmbientCalmOverlay(
         Text(
           text = stringResource(R.string.action_quick_actions_short),
           fontFamily = FunctionalSansFontFamily,
-          fontSize = 12.sp,
-          color = Color(0x48FFFFFF)
+          fontSize = 12.5.sp,
+          color = Color(0x88FFFFFF)
         )
       }
       TextButton(
@@ -518,8 +519,8 @@ private fun AmbientCalmOverlay(
         Text(
           text = stringResource(R.string.action_lock_settings),
           fontFamily = FunctionalSansFontFamily,
-          fontSize = 12.sp,
-          color = Color(0x48FFFFFF)
+          fontSize = 12.5.sp,
+          color = Color(0xA6FFFFFF)
         )
       }
     }

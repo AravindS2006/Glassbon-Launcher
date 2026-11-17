@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -154,6 +155,20 @@ class DrawerAlphabetJumpRobolectricTest {
       composeTestRule.waitForIdle()
       composeTestRule.onNodeWithTag("app_drawer_screen").assertDoesNotExist()
       composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+
+      // Open/scrub drawer via left-edge rail -> strictly 1 right-side alphabet rail (never 2!)
+      composeTestRule.onNodeWithTag("left_alphabet_rail").performTouchInput {
+        down(centerLeft)
+        moveBy(androidx.compose.ui.geometry.Offset(36f, 60f))
+      }
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag("app_drawer_screen").assertIsDisplayed()
+      composeTestRule.onAllNodesWithTag("alphabet_rail").assertCountEquals(1)
+      composeTestRule.onNodeWithTag("left_alphabet_rail").performTouchInput {
+        up()
+      }
+      composeTestRule.waitForIdle()
+      composeTestRule.onAllNodesWithTag("alphabet_rail").assertCountEquals(1)
     }
   }
 }
