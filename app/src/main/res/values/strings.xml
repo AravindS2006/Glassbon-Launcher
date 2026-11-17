@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Glassbon</string>
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
-    <string name="cd_open_quick_actions">Lock screen or hold for quick actions</string>
+    <string name="cd_open_quick_actions">Open quick actions or hold for menu</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_close_search">Close search</string>
@@ -11,9 +11,6 @@
     <string name="cd_media_previous">Previous track</string>
     <string name="cd_media_play_pause">Play or pause</string>
     <string name="cd_media_next">Next track</string>
-    <string name="device_admin_lock_label">Glassbon Screen Lock</string>
-    <string name="device_admin_lock_description">Allows Glassbon\'s power button to lock your screen in one tap. Only screen-lock permission is used.</string>
-    <string name="media_listener_label">Glassbon Media Controls</string>
     <string name="onboarding_title">Set Glassbon as your Home</string>
     <string name="onboarding_tour_only_title">Explore Glassbon</string>
     <string name="onboarding_body">Make Glassbon your default launcher to return here whenever you press Home.</string>
@@ -21,15 +18,12 @@
     <string name="onboarding_cta">Set Default</string>
     <string name="onboarding_start_tour">Take Tour</string>
     <string name="onboarding_dismiss">Later</string>
-    <string name="lock_permission_title">Enable One-Tap Screen Lock</string>
-    <string name="lock_permission_body">Activate Glassbon Screen Lock in Device Admin settings so tapping the power button locks your phone instantly. Long-press anytime for Quick Actions.</string>
-    <string name="lock_permission_cta">Activate Lock</string>
     <string name="search_placeholder">Search apps…</string>
     <string name="search_empty_title">No matching apps</string>
     <string name="search_empty_subtitle">Try another name or clear your search.</string>
     <string name="favorites_section_title">Favorites</string>
     <string name="quick_actions_title">Quick Actions</string>
-    <string name="action_lock_screen">Lock Screen</string>
+    <string name="action_calm_screen">OLED Calm Screen</string>
     <string name="action_app_library">App Library</string>
     <string name="action_search_apps">Search Apps</string>
     <string name="action_wallpaper_studio">Wallpaper</string>

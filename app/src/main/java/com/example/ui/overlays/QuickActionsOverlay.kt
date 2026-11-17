@@ -28,11 +28,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
@@ -40,7 +39,6 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,16 +62,14 @@ import com.example.ui.theme.MistColors
 @Composable
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
-  isMediaListenerEnabled: Boolean,
   reducedMotion: Boolean = false,
-  onLockScreen: () -> Unit,
+  onOpenCalmScreen: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
   onOpenWallpaper: () -> Unit,
   onOpenFavorites: () -> Unit,
   onOpenPreferences: () -> Unit,
   onStartWalkthrough: () -> Unit,
-  onOpenMediaListenerSettings: () -> Unit,
   onOpenDeviceSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onDismiss: () -> Unit
@@ -139,10 +135,10 @@ fun QuickActionsOverlay(
         HorizontalDivider(color = MistColors.HairlineDivider)
 
         QuickActionRow(
-          icon = Icons.Outlined.Lock,
-          label = stringResource(R.string.action_lock_screen),
-          testTag = "qa_lock_screen",
-          onClick = onLockScreen
+          icon = Icons.Outlined.Bedtime,
+          label = stringResource(R.string.action_calm_screen),
+          testTag = "qa_calm_screen",
+          onClick = onOpenCalmScreen
         )
         QuickActionRow(
           icon = Icons.Outlined.Apps,
@@ -187,13 +183,6 @@ fun QuickActionsOverlay(
         )
 
         QuickActionRow(
-          icon = Icons.Outlined.MusicNote,
-          label = stringResource(R.string.media_listener_label),
-          badge = if (isMediaListenerEnabled) "Active" else "Enable",
-          testTag = "qa_media_listener",
-          onClick = onOpenMediaListenerSettings
-        )
-        QuickActionRow(
           icon = Icons.Outlined.Home,
           label = stringResource(R.string.action_set_default_home),
           badge = if (isDefaultLauncher) "Active" else "Set",
@@ -206,94 +195,6 @@ fun QuickActionsOverlay(
           testTag = "qa_device_settings",
           onClick = onOpenDeviceSettings
         )
-      }
-    }
-  }
-}
-
-@Composable
-fun LockPermissionDialog(
-  onActivateDeviceAdmin: () -> Unit,
-  onOpenQuickActions: () -> Unit,
-  onDismiss: () -> Unit
-) {
-  BackHandler(onBack = onDismiss)
-
-  Box(
-    modifier = Modifier
-      .fillMaxSize()
-      .background(Color(0x7809090B))
-      .clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        onClick = onDismiss
-      )
-      .padding(24.dp)
-      .testTag("lock_permission_dialog"),
-    contentAlignment = Alignment.Center
-  ) {
-    GlassSurface(
-      modifier = Modifier
-        .widthIn(max = 360.dp)
-        .clickable(
-          interactionSource = remember { MutableInteractionSource() },
-          indication = null,
-          onClick = {}
-        ),
-      shape = RoundedCornerShape(22.dp)
-    ) {
-      Column(modifier = Modifier.padding(20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-            imageVector = Icons.Outlined.Lock,
-            contentDescription = null,
-            tint = MistColors.PureWhite,
-            modifier = Modifier.size(20.dp)
-          )
-          Spacer(modifier = Modifier.width(10.dp))
-          Text(
-            text = stringResource(R.string.lock_permission_title),
-            fontFamily = FunctionalSansFontFamily,
-            fontSize = 18.sp,
-            color = MistColors.OffWhite
-          )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-          text = stringResource(R.string.lock_permission_body),
-          fontFamily = FunctionalSansFontFamily,
-          fontSize = 13.5.sp,
-          lineHeight = 19.sp,
-          color = MistColors.MistGrey.copy(alpha = 0.88f)
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.End
-        ) {
-          TextButton(
-            onClick = onOpenQuickActions,
-            modifier = Modifier.testTag("lock_dialog_quick_actions_button")
-          ) {
-            Text(
-              text = stringResource(R.string.quick_actions_title),
-              fontFamily = FunctionalSansFontFamily,
-              fontSize = 12.5.sp,
-              color = MistColors.MistGrey
-            )
-          }
-          TextButton(
-            onClick = onActivateDeviceAdmin,
-            modifier = Modifier.testTag("lock_dialog_admin_button")
-          ) {
-            Text(
-              text = stringResource(R.string.lock_permission_cta),
-              fontFamily = FunctionalSansFontFamily,
-              fontSize = 12.5.sp,
-              color = MistColors.PureWhite
-            )
-          }
-        }
       }
     }
   }

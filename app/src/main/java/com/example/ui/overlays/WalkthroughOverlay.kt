@@ -34,8 +34,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryChargingFull
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Gesture
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
@@ -121,18 +121,18 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Dynamic Layout",
-    title = "Smart Live Media Capsule",
-    description = "When music or podcasts play, a frosted media card expands smoothly beneath the clock. When paused or stopped, that vertical space returns to Home.",
-    tip = "Allow Glassbon Media Controls once in Notification Access.",
+    title = "Smart Audio Media Capsule",
+    description = "When music or podcasts play, a frosted media card expands smoothly beneath the clock using hardware media keys. When paused or stopped, that space returns to Home.",
+    tip = "Zero sensitive notification permissions required.",
     icon = Icons.Outlined.MusicNote,
     anchor = SpatialAnchor.TOP_MID
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "One-Tap Lock & Quick Actions",
-    description = "Tap the floating glass Power button to lock your screen immediately. Long-press it anytime for Quick Actions, Wallpaper Studio, and this Guided Tour.",
-    tip = "All customization lives cleanly inside Quick Actions.",
-    icon = Icons.Outlined.Lock,
+    title = "Quick Actions & OLED Calm",
+    description = "Tap the floating glass control to summon Quick Actions—or set it to open OLED Calm Screen, Search, or App Library directly.",
+    tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside.",
+    icon = Icons.Outlined.Bedtime,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
 )
@@ -511,7 +511,7 @@ private fun SpatialAnchorBeacons(anchor: SpatialAnchor) {
 
       SpatialAnchor.BOTTOM_RIGHT -> {
         SpatialBeaconPill(
-          label = "Tap to Lock · Hold for Actions",
+          label = "Quick Actions · Calm Screen",
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 22.dp, bottom = 78.dp)

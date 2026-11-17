@@ -8,7 +8,7 @@ Thank you for helping make **Glassbon** faster, cleaner, and more intentional. G
 
 1. **Zero Idle Battery & CPU Overhead**
    - Do **not** add background polling timers, `while (true)` `delay()` coroutines, `WakeLock`s, or `WorkManager` periodic jobs.
-   - Use event-driven Android system broadcasts (`ACTION_TIME_TICK`, `ACTION_PACKAGE_*`, `MediaSessionManager` callbacks) and unregister listeners in `onStop()` / `onCleared()`.
+   - Use event-driven Android system broadcasts (`ACTION_TIME_TICK`, `ACTION_PACKAGE_*`) and unregister listeners in `onStop()` / `onCleared()`.
 2. **Smooth 60–120 FPS Rendering**
    - Evaluate transient animations strictly inside `Modifier.graphicsLayer { ... }` or `Modifier.offset { ... }` lambdas so scrolling and scrubbing avoid full-tree recompositions.
    - Do **not** introduce per-frame live `RenderEffect` / software blur shaders over scrolling `LazyColumn` lists; use cached static pre-blurred bitmaps in `WallpaperProcessor`.
@@ -17,9 +17,9 @@ Thank you for helping make **Glassbon** faster, cleaner, and more intentional. G
    - Follow **Kotlin + Jetpack Compose + Material 3 + MVVM** (`StateFlow` + `collectAsStateWithLifecycle`).
    - Keep composables modular and files focused.
    - Assign `Modifier.testTag("snake_case_name")` to all interactive elements, enforce minimum `48.dp` touch targets, and provide meaningful `contentDescription` strings.
-4. **Privacy & Play-Protect Hygiene First**
-   - **Never** add `INTERNET`, `READ_EXTERNAL_STORAGE`, `REQUEST_DELETE_PACKAGES`, `BIND_ACCESSIBILITY_SERVICE`, or broad media read permissions (`PickVisualMedia` photo picker only).
-   - Keep Device Admin (`force-lock` only) and Media Listener (`NotificationListenerService`) strictly scoped to their stated actions.
+4. **Privacy & Play-Protect Hygiene First (Zero Sensitive Permissions)**
+   - **Never** add `INTERNET`, `READ_EXTERNAL_STORAGE`, `REQUEST_DELETE_PACKAGES`, `BIND_ACCESSIBILITY_SERVICE`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`, `READ_SMS`, or broad media read permissions (`PickVisualMedia` photo picker only).
+   - Route uninstall actions to system App Info (`ACTION_APPLICATION_DETAILS_SETTINGS`) and media keys through `AudioManager`.
 
 ---
 

@@ -24,7 +24,7 @@ class LauncherUiRobolectricTest {
   val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
-  fun `home screen renders clock date alphabet rail and power lock dialog on tap`() {
+  fun `home screen renders clock date alphabet rail and quick actions opens calm screen`() {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_clock_area").assertIsDisplayed()
@@ -33,14 +33,16 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on power button prompts to activate Device Admin Screen Lock when not active
+    // Single tap opens Quick Actions Panel; OLED Calm Screen enters and exits cleanly
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("lock_dialog_admin_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("lock_dialog_quick_actions_button").performClick()
-    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("qa_calm_screen").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
   }
 
   @Test

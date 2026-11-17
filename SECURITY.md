@@ -5,10 +5,10 @@
 **Glassbon Launcher** is engineered as a strictly offline, privacy-preserving Android launcher:
 
 - **No Network Access**: The app does **not** declare `android.permission.INTERNET` and sends zero telemetry, analytics, or crash payloads.
-- **Minimal Permissions**:
+- **Zero Sensitive Permissions (Play-Protect Clean)**:
   - Custom wallpapers use Android's zero-permission Photo Picker (`ActivityResultContracts.PickVisualMedia`).
-  - `GlassbonDeviceAdminReceiver` requests strictly `force-lock` solely to lock the screen on power button tap—no Accessibility Service, no `REQUEST_DELETE_PACKAGES` (uninstalls route safely to system App Info).
-  - `GlassbonMediaListenerService` reads active `MediaController` playback state/metadata locally on-device solely to render Home playback controls.
+  - Media playback controls use `AudioManager.dispatchMediaKeyEvent(...)`—no `BIND_NOTIFICATION_LISTENER_SERVICE`.
+  - No `BIND_ACCESSIBILITY_SERVICE`, no `BIND_DEVICE_ADMIN`, no `READ_SMS`/`RECEIVE_SMS`, and no `REQUEST_DELETE_PACKAGES` (uninstalls route safely to system App Info).
 
 ## Supported Versions
 

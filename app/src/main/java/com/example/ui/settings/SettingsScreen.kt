@@ -82,8 +82,6 @@ fun SettingsScreen(
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
-  onOpenDeviceAdminActivation: () -> Unit,
-  onOpenNotificationListenerSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
   onClose: () -> Unit
@@ -247,7 +245,7 @@ fun SettingsScreen(
           )
           DividerLine()
           SegmentedPreferenceRow(
-            title = "Bottom-Right Power Button Tap",
+            title = "Bottom-Right Action Button Tap",
             options = QuickActionMode.entries,
             selected = prefs.quickActionMode,
             label = { it.displayName },
@@ -291,30 +289,8 @@ fun SettingsScreen(
           )
         }
 
-        // SYSTEM PERMISSIONS & LAUNCHER ROLE
+        // SYSTEM INTEGRATION (ZERO SENSITIVE PERMISSIONS)
         SectionBlock(title = "System Integration") {
-          NavigationPreferenceRow(
-            title = "One-Tap Screen Lock (Device Admin)",
-            subtitle = if (uiState.isDeviceAdminLockEnabled) {
-              "Active — power button locks screen instantly"
-            } else {
-              "Tap to activate Glassbon Screen Lock"
-            },
-            testTag = "settings_device_admin_row",
-            onClick = onOpenDeviceAdminActivation
-          )
-          DividerLine()
-          NavigationPreferenceRow(
-            title = "Live Media Controls (Notifications)",
-            subtitle = if (uiState.isMediaListenerEnabled) {
-              "Active — Home shows playing track & liquid artwork"
-            } else {
-              "Tap to allow media session reading"
-            },
-            testTag = "settings_media_listener_row",
-            onClick = onOpenNotificationListenerSettings
-          )
-          DividerLine()
           NavigationPreferenceRow(
             title = "Default Home Application",
             subtitle = if (uiState.isDefaultLauncher) "Glassbon is currently default" else "Tap to set Glassbon as default Home",

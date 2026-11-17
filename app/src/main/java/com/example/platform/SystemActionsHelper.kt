@@ -87,21 +87,14 @@ object SystemActionsHelper {
     return tryStartActivity(context, viewIntent)
   }
 
-  fun openDeviceAdminLockActivation(context: Context): Boolean {
-    val adminIntent = GlassbonDeviceAdminReceiver.createEnableAdminIntent(context)
-    if (tryStartActivity(context, adminIntent)) return true
-
-    val securityIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+  fun openMusicApp(context: Context): Boolean {
+    val musicIntent = Intent.makeMainSelectorActivity(
+      Intent.ACTION_MAIN,
+      Intent.CATEGORY_APP_MUSIC
+    ).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return tryStartActivity(context, securityIntent)
-  }
-
-  fun openNotificationListenerSettings(context: Context): Boolean {
-    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    return tryStartActivity(context, intent)
+    return tryStartActivity(context, musicIntent)
   }
 
   private fun tryStartActivity(context: Context, intent: Intent): Boolean {

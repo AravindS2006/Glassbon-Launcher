@@ -23,8 +23,6 @@ import com.example.data.preferences.TypographyStyle
 import com.example.data.wallpaper.ProcessedWallpaper
 import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
-import com.example.platform.GlassbonDeviceAdminReceiver
-import com.example.platform.GlassbonMediaListenerService
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -91,14 +89,12 @@ data class LauncherUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
-  val showLockPermissionPrompt: Boolean = false,
+  val showAmbientCalmScreen: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isDeviceAdminLockEnabled: Boolean = false,
-  val isMediaListenerEnabled: Boolean = false,
   val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
   val wallpaper: ProcessedWallpaper = ProcessedWallpaper(null, null, isTopBright = true),
@@ -124,14 +120,12 @@ private data class TransientUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
-  val showLockPermissionPrompt: Boolean = false,
+  val showAmbientCalmScreen: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isDeviceAdminLockEnabled: Boolean = false,
-  val isMediaListenerEnabled: Boolean = false,
   val statusMessage: String? = null
 )
 
@@ -148,9 +142,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   private val transientState = MutableStateFlow(
     TransientUiState(
-      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-      isDeviceAdminLockEnabled = GlassbonDeviceAdminReceiver.isAdminActive(appContext),
-      isMediaListenerEnabled = GlassbonMediaListenerService.isPermissionGranted(appContext)
+      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
     )
   )
   private val wallpaperState = MutableStateFlow(
@@ -237,14 +229,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       drawerJumpTarget = transient.drawerJumpTarget,
       isSearchActive = transient.isSearchActive,
       showQuickActions = transient.showQuickActions,
-      showLockPermissionPrompt = transient.showLockPermissionPrompt,
+      showAmbientCalmScreen = transient.showAmbientCalmScreen,
       showWalkthrough = transient.showWalkthrough,
       walkthroughStep = transient.walkthroughStep,
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
-      isDeviceAdminLockEnabled = transient.isDeviceAdminLockEnabled,
-      isMediaListenerEnabled = transient.isMediaListenerEnabled,
       activeMedia = media,
       preferences = derived.prefs,
       wallpaper = wallpaper,
@@ -355,9 +345,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   fun refreshSystemStatus() {
     transientState.update {
       it.copy(
-        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-        isDeviceAdminLockEnabled = GlassbonDeviceAdminReceiver.isAdminActive(appContext),
-        isMediaListenerEnabled = GlassbonMediaListenerService.isPermissionGranted(appContext)
+        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
       )
     }
   }
@@ -370,7 +358,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         isSearchActive = false,
         searchQuery = "",
         showQuickActions = false,
-        showLockPermissionPrompt = false,
+        showAmbientCalmScreen = false,
         showWalkthrough = false,
         activeOverlay = LauncherOverlay.NONE,
         contextMenuApp = null
@@ -386,7 +374,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         isSearchActive = withSearch,
         searchQuery = if (withSearch) it.searchQuery else "",
         showQuickActions = false,
-        showLockPermissionPrompt = false,
+        showAmbientCalmScreen = false,
         activeOverlay = LauncherOverlay.NONE,
         contextMenuApp = null
       )
@@ -429,33 +417,22 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onHomePowerButtonTap() {
     when (uiState.value.preferences.quickActionMode) {
-      QuickActionMode.LOCK_SCREEN -> lockScreenOrPrompt()
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
+      QuickActionMode.OLED_CALM_SCREEN -> setAmbientCalmScreen(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
     }
   }
 
-  fun lockScreenOrPrompt() {
-    if (GlassbonDeviceAdminReceiver.lockScreenNow(appContext)) {
-      transientState.update { it.copy(showQuickActions = false, showLockPermissionPrompt = false) }
-    } else {
-      transientState.update { it.copy(showQuickActions = false, showLockPermissionPrompt = true) }
+  fun setAmbientCalmScreen(show: Boolean) {
+    transientState.update {
+      it.copy(
+        showAmbientCalmScreen = show,
+        showQuickActions = false,
+        contextMenuApp = null,
+        activeOverlay = if (show) LauncherOverlay.NONE else it.activeOverlay
+      )
     }
-  }
-
-  fun dismissLockPermissionPrompt() {
-    transientState.update { it.copy(showLockPermissionPrompt = false) }
-  }
-
-  fun openDeviceAdminActivation() {
-    dismissLockPermissionPrompt()
-    SystemActionsHelper.openDeviceAdminLockActivation(appContext)
-  }
-
-  fun openNotificationListenerSettings() {
-    toggleQuickActions(false)
-    SystemActionsHelper.openNotificationListenerSettings(appContext)
   }
 
   fun openClockApp() {
@@ -480,7 +457,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun toggleQuickActions(show: Boolean) {
     transientState.update {
-      it.copy(showQuickActions = show, contextMenuApp = null, showLockPermissionPrompt = false)
+      it.copy(showQuickActions = show, contextMenuApp = null, showAmbientCalmScreen = false)
     }
   }
 
@@ -489,7 +466,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       it.copy(
         activeOverlay = overlay,
         showQuickActions = false,
-        showLockPermissionPrompt = false,
+        showAmbientCalmScreen = false,
         contextMenuApp = null
       )
     }
@@ -514,7 +491,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         drawerJumpTarget = null,
         isSearchActive = false,
         showQuickActions = false,
-        showLockPermissionPrompt = false,
+        showAmbientCalmScreen = false,
         activeOverlay = LauncherOverlay.NONE,
         contextMenuApp = null,
         showWalkthrough = true,

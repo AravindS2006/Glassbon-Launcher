@@ -25,7 +25,7 @@
     <td width="50%" align="center">
       <img src="docs/media/glassbon-home-mockup.jpg" alt="Glassbon Home Screen Hardware Mockup" width="100%" />
       <br />
-      <sub><strong>Intentional Home Workspace</strong> — Unified Clock & Calendar pill, compact left-gutter squircles, adaptive ink, and bottom-right glass Power control.</sub>
+      <sub><strong>Intentional Home Workspace</strong> — Unified Clock & Calendar pill, compact left-gutter squircles, adaptive ink, and bottom-right Quick Actions control.</sub>
     </td>
     <td width="50%" align="center">
       <img src="docs/media/glassbon-wave-drawer-mockup.jpg" alt="Glassbon Dual-Edge Curved Wave & Pop-Up App Preview Mockup" width="100%" />
@@ -50,11 +50,11 @@
 - **Compact Frosted Squircles & Pop-Up App Preview**
   - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights and corner-sampled background suppression.
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
-- **Dynamic Live Media Capsule**
-  - Automatically expands beneath Clock/Date while music or podcasts play (and holds briefly for 12s when paused), then collapses cleanly to reclaim vertical Home space when idle.
-- **One-Tap Device Admin Screen Lock & Quick Actions**
-  - Tap the bottom-right glass Power button to lock the screen instantly via Play-Protect-clean `DeviceAdminReceiver` (`force-lock` policy only).
-  - Long-press it for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (including **Ultra-Smooth** vs. **Low Power** mode), and the **Guided Feature Tour**.
+- **Smart Audio Media Capsule**
+  - Automatically expands beneath Clock/Date using zero-permission `AudioManager` hardware media key events (`KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` / `PREVIOUS`) while audio plays, then collapses cleanly when idle.
+- **Quick Actions, OLED Calm Screen & Zero Sensitive Permissions**
+  - Tap the bottom-right glass control for **Quick Actions**—or configure it for **OLED Calm Screen** (`#000000` sanctuary), **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), and the **Guided Feature Tour**.
+  - Zero `INTERNET`, Accessibility, Device Admin, Notification Listener, or broad storage permissions—engineered cleanly for Google Play Protect.
 
 ---
 
@@ -70,7 +70,7 @@
 | **Luminance Contrast** | Single `12×12` pixel grid sample on `Dispatchers.IO` upon wallpaper change | Cached boolean flags; zero runtime polling |
 | **Hidden Left Wave** | Transparent `30.dp` touch strip at rest; 28-letter Gaussian arc composes only during drag | `0%` idle CPU/GPU composition cost |
 | **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; respects **Reduced Motion** |
-| **Clock & Media** | Event-driven `ACTION_TIME_TICK` & `MediaController.Callback` bound to `onStart`/`onStop` | Zero background loops, `WakeLock`s, or timers |
+| **Clock & Media** | Event-driven `ACTION_TIME_TICK` & `AudioManager` media keys bound to `onStart`/`onStop` | Zero background loops, listeners, or timers |
 
 ---
 
@@ -82,8 +82,8 @@ Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOv
 2. **Unified Clock & Calendar Pill** — Tap targets & adaptive wallpaper contrast.
 3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
 4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
-5. **Smart Live Media Capsule** — Space-reclaiming dynamic playback card.
-6. **One-Tap Lock & Quick Actions** — Power button tap vs. hold gestures.
+5. **Smart Audio Media Capsule** — Space-reclaiming zero-permission playback card.
+6. **Quick Actions & OLED Calm** — Bottom-right control modes & `#000000` ambient calm screen.
 
 Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
 

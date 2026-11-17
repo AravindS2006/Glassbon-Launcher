@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,8 +9,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,19 +41,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.platform.ClockSnapshot
 import com.example.platform.rememberSystemClockSnapshot
 import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.GlassSurface
 import com.example.ui.drawer.AppDrawerScreen
 import com.example.ui.home.HomeScreen
 import com.example.ui.overlays.AppContextMenuDialog
-import com.example.ui.overlays.LockPermissionDialog
 import com.example.ui.overlays.QuickActionsOverlay
 import com.example.ui.overlays.WalkthroughOverlay
 import com.example.ui.settings.FavoritesManagerScreen
 import com.example.ui.settings.HiddenAppsScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.settings.WallpaperStudioScreen
+import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import kotlinx.coroutines.delay
@@ -65,7 +73,7 @@ fun LauncherRoot(
 
   val isOverlayBlockingLightTop = uiState.isDrawerOpen ||
     uiState.showQuickActions ||
-    uiState.showLockPermissionPrompt ||
+    uiState.showAmbientCalmScreen ||
     uiState.showWalkthrough ||
     uiState.contextMenuApp != null ||
     uiState.activeOverlay == LauncherOverlay.SETTINGS ||
@@ -255,8 +263,6 @@ fun LauncherRoot(
         onOpenWallpaperStudio = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavoritesManager = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenHiddenApps = { viewModel.openOverlay(LauncherOverlay.HIDDEN_APPS) },
-        onOpenDeviceAdminActivation = { viewModel.openDeviceAdminActivation() },
-        onOpenNotificationListenerSettings = { viewModel.openNotificationListenerSettings() },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartWalkthrough = { viewModel.startWalkthrough() },
         onClose = { viewModel.closeOverlay() }
@@ -315,16 +321,14 @@ fun LauncherRoot(
     ) {
       QuickActionsOverlay(
         isDefaultLauncher = uiState.isDefaultLauncher,
-        isMediaListenerEnabled = uiState.isMediaListenerEnabled,
         reducedMotion = prefs.effectiveReducedMotion,
-        onLockScreen = { viewModel.lockScreenOrPrompt() },
+        onOpenCalmScreen = { viewModel.setAmbientCalmScreen(true) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
         onOpenWallpaper = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavorites = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenPreferences = { viewModel.openOverlay(LauncherOverlay.SETTINGS) },
         onStartWalkthrough = { viewModel.startWalkthrough() },
-        onOpenMediaListenerSettings = { viewModel.openNotificationListenerSettings() },
         onOpenDeviceSettings = { viewModel.openDeviceSettings() },
         onRequestDefaultHome = {
           viewModel.toggleQuickActions(false)
@@ -334,16 +338,16 @@ fun LauncherRoot(
       )
     }
 
-    // 7. Device Admin Lock Permission Guidance Dialog
+    // 7. Pure #000000 OLED Calm Screen (Zero-permission visual sanctuary)
     AnimatedVisibility(
-      visible = uiState.showLockPermissionPrompt,
+      visible = uiState.showAmbientCalmScreen,
       enter = fadeIn(tween(quickDuration)),
       exit = fadeOut(tween(quickDuration))
     ) {
-      LockPermissionDialog(
-        onActivateDeviceAdmin = { viewModel.openDeviceAdminActivation() },
-        onOpenQuickActions = { viewModel.toggleQuickActions(true) },
-        onDismiss = { viewModel.dismissLockPermissionPrompt() }
+      AmbientCalmOverlay(
+        clockSnapshot = clockSnapshot,
+        showClock = prefs.showClock,
+        onDismiss = { viewModel.setAmbientCalmScreen(false) }
       )
     }
 
@@ -417,3 +421,48 @@ private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
     1.0f to Color(0x780B0B0D)
   )
 )
+
+@Composable
+private fun AmbientCalmOverlay(
+  clockSnapshot: ClockSnapshot,
+  showClock: Boolean,
+  onDismiss: () -> Unit
+) {
+  BackHandler(onBack = onDismiss)
+
+  Box(
+    modifier = Modifier
+      .fillMaxSize()
+      .background(Color.Black)
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = onDismiss
+      )
+      .testTag("ambient_calm_overlay"),
+    contentAlignment = Alignment.Center
+  ) {
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
+      modifier = Modifier.padding(32.dp)
+    ) {
+      if (showClock) {
+        Text(
+          text = clockSnapshot.formattedTime,
+          fontFamily = EditorialDisplayFontFamily,
+          fontSize = 54.sp,
+          color = Color(0x2EFFFFFF)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+      }
+      Text(
+        text = "Tap anywhere to return",
+        fontFamily = FunctionalSansFontFamily,
+        fontSize = 12.sp,
+        letterSpacing = 0.6.sp,
+        color = Color(0x24FFFFFF)
+      )
+    }
+  }
+}

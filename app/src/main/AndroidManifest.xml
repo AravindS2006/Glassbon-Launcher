@@ -37,32 +37,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
-        <!-- Scoped Device Admin receiver for one-tap screen lock (force-lock policy only) -->
-        <receiver
-            android:name=".platform.GlassbonDeviceAdminReceiver"
-            android:description="@string/device_admin_lock_description"
-            android:exported="true"
-            android:label="@string/device_admin_lock_label"
-            android:permission="android.permission.BIND_DEVICE_ADMIN">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/glassbon_device_admin" />
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Notification listener service for observing active MediaSession playback -->
-        <service
-            android:name=".platform.GlassbonMediaListenerService"
-            android:exported="true"
-            android:label="@string/media_listener_label"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
     </application>
 
 </manifest>

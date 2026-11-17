@@ -26,8 +26,8 @@ enum class HomeAlphabetVisibility(val displayName: String) {
 }
 
 enum class QuickActionMode(val displayName: String) {
-  LOCK_SCREEN("One-Tap Lock"),
   QUICK_PANEL("Quick Actions Panel"),
+  OLED_CALM_SCREEN("OLED Calm Screen"),
   DIRECT_SEARCH("Open Search"),
   DIRECT_LIBRARY("Open App Library")
 }
@@ -61,7 +61,7 @@ data class LauncherPreferences(
   val reducedMotion: Boolean = false,
   val lowEffectsMode: Boolean = false,
   val hapticFeedback: Boolean = true,
-  val quickActionMode: QuickActionMode = QuickActionMode.LOCK_SCREEN,
+  val quickActionMode: QuickActionMode = QuickActionMode.QUICK_PANEL,
   val onboardingDismissed: Boolean = false,
   val walkthroughCompleted: Boolean = false,
   val favoritesSeeded: Boolean = false
