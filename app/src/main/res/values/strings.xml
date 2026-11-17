@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Glassbon</string>
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
-    <string name="cd_open_quick_actions">Lock or calm screen, hold for quick actions</string>
+    <string name="cd_open_quick_actions">Lock screen, hold for quick actions</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_close_search">Close search</string>
@@ -23,10 +23,18 @@
     <string name="search_empty_subtitle">Try another name or clear your search.</string>
     <string name="favorites_section_title">Favorites</string>
     <string name="quick_actions_title">Quick Actions</string>
-    <string name="action_calm_screen">Lock / Calm Screen</string>
+    <string name="action_lock_screen">Lock Screen</string>
+    <string name="action_calm_screen">OLED Calm Screen</string>
     <string name="action_quick_actions_short">Quick Actions</string>
     <string name="action_lock_settings">Screen Lock Settings</string>
     <string name="cd_calm_lock_settings">Open Screen Lock Settings</string>
+    <string name="accessibility_lock_label">Glassbon One-Tap Lock</string>
+    <string name="accessibility_lock_description">Used strictly to lock the screen when you tap the bottom-right lock button. Glassbon cannot read screen content and works completely offline.</string>
+    <string name="lock_dialog_title">Enable One-Tap Screen Lock</string>
+    <string name="lock_dialog_body">To lock your phone in one tap while keeping Fingerprint and Face Unlock working, enable \"Glassbon One-Tap Lock\" in Android Accessibility Settings.\n\nGlassbon sets canRetrieveWindowContent=false, reads zero screen text or passwords, and runs completely offline.\n\nIf the toggle is greyed out after sideloading (Android 13+), open App Info → ⋮ menu → \"Allow restricted settings\" first.</string>
+    <string name="lock_dialog_open_accessibility">Open Accessibility Settings</string>
+    <string name="lock_dialog_open_app_info">Open App Info</string>
+    <string name="lock_dialog_use_calm">Use OLED Calm Screen</string>
     <string name="action_app_library">App Library</string>
     <string name="action_search_apps">Search Apps</string>
     <string name="action_wallpaper_studio">Wallpaper</string>

@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +25,7 @@ import com.example.data.preferences.TypographyStyle
 import com.example.data.wallpaper.ProcessedWallpaper
 import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
+import com.example.platform.ScreenLockHelper
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -91,11 +93,13 @@ data class LauncherUiState(
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
   val showAmbientCalmScreen: Boolean = false,
+  val showLockPermissionDialog: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
+  val isScreenLockEnabled: Boolean = false,
   val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
   val wallpaper: ProcessedWallpaper = ProcessedWallpaper(null, null, isTopBright = true),
@@ -122,11 +126,13 @@ private data class TransientUiState(
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
   val showAmbientCalmScreen: Boolean = false,
+  val showLockPermissionDialog: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
+  val isScreenLockEnabled: Boolean = false,
   val statusMessage: String? = null
 )
 
@@ -143,7 +149,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   private val transientState = MutableStateFlow(
     TransientUiState(
-      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
+      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
+      isScreenLockEnabled = ScreenLockHelper.isAccessibilityServiceEnabled(appContext)
     )
   )
   private val wallpaperState = MutableStateFlow(
@@ -237,11 +244,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       isSearchActive = transient.isSearchActive,
       showQuickActions = transient.showQuickActions,
       showAmbientCalmScreen = transient.showAmbientCalmScreen,
+      showLockPermissionDialog = transient.showLockPermissionDialog,
       showWalkthrough = transient.showWalkthrough,
       walkthroughStep = transient.walkthroughStep,
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
+      isScreenLockEnabled = transient.isScreenLockEnabled,
       activeMedia = media,
       preferences = derived.prefs,
       wallpaper = wallpaper,
@@ -352,7 +361,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   fun refreshSystemStatus() {
     transientState.update {
       it.copy(
-        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
+        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
+        isScreenLockEnabled = ScreenLockHelper.isAccessibilityServiceEnabled(appContext)
       )
     }
   }
@@ -426,12 +436,74 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update { it.copy(searchQuery = query) }
   }
 
-  fun onHomePowerButtonTap() {
+  fun onHomePowerButtonTap(context: Context = appContext) {
     when (uiState.value.preferences.quickActionMode) {
+      QuickActionMode.LOCK_SCREEN -> triggerScreenLock(context)
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
       QuickActionMode.OLED_CALM_SCREEN -> setAmbientCalmScreen(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
+    }
+  }
+
+  fun triggerScreenLock(context: Context = appContext) {
+    val locked = ScreenLockHelper.lockScreen()
+    if (locked) {
+      transientState.update {
+        it.copy(
+          showQuickActions = false,
+          showAmbientCalmScreen = false,
+          showLockPermissionDialog = false,
+          contextMenuApp = null,
+          isScreenLockEnabled = true
+        )
+      }
+      return
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+      setAmbientCalmScreen(true)
+      transientState.update {
+        it.copy(statusMessage = "OLED Calm Screen active (hardware lock requires Android 9+).")
+      }
+      return
+    }
+    val enabled = ScreenLockHelper.isAccessibilityServiceEnabled(context)
+    transientState.update {
+      it.copy(
+        isScreenLockEnabled = enabled,
+        showQuickActions = false,
+        showAmbientCalmScreen = false,
+        showLockPermissionDialog = true,
+        contextMenuApp = null
+      )
+    }
+  }
+
+  fun openLockPermissionPrompt() {
+    transientState.update {
+      it.copy(
+        showQuickActions = false,
+        showAmbientCalmScreen = false,
+        showLockPermissionDialog = true
+      )
+    }
+  }
+
+  fun dismissLockPermissionDialog() {
+    transientState.update { it.copy(showLockPermissionDialog = false) }
+  }
+
+  fun openAccessibilitySettings(context: Context = appContext) {
+    transientState.update { it.copy(showLockPermissionDialog = false) }
+    if (!ScreenLockHelper.openAccessibilitySettings(context)) {
+      transientState.update { it.copy(statusMessage = "Accessibility settings unavailable.") }
+    }
+  }
+
+  fun openGlassbonAppInfo(context: Context = appContext) {
+    transientState.update { it.copy(showLockPermissionDialog = false) }
+    if (!SystemActionsHelper.openAppInfo(context, context.packageName)) {
+      transientState.update { it.copy(statusMessage = "App Info unavailable.") }
     }
   }
 
@@ -440,6 +512,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       it.copy(
         showAmbientCalmScreen = show,
         showQuickActions = false,
+        showLockPermissionDialog = false,
         contextMenuApp = null,
         activeOverlay = if (show) LauncherOverlay.NONE else it.activeOverlay
       )

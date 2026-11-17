@@ -129,8 +129,8 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "Lock / Calm Screen & Quick Actions",
-    description = "Tap the floating power button for pure OLED Lock / Calm Screen with Screen Lock Settings—or press and hold anytime to summon Quick Actions.",
+    title = "One-Tap Lock & Quick Actions",
+    description = "Tap the floating power button to lock your screen immediately (preserving Fingerprint & Face Unlock)—or press and hold anytime to summon Quick Actions.",
     tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside Quick Actions.",
     icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT

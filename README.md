@@ -52,9 +52,9 @@
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
 - **Smart Audio Media Capsule**
   - Automatically expands beneath Clock/Date using zero-permission `AudioManager` hardware media key events (`KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` / `PREVIOUS`) while audio plays, then collapses cleanly when idle.
-- **Lock / Calm Screen, Quick Actions & Zero Sensitive Permissions**
-  - Tap the bottom-right glass power/lock button for **Lock / Calm Screen** (`#000000` sanctuary + **Screen Lock Settings**), or press and hold for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), and the **Guided Feature Tour**.
-  - Zero `INTERNET`, Accessibility, Device Admin, Notification Listener, or broad storage permissions—engineered cleanly for Google Play Protect.
+- **One-Tap Lock Screen, Quick Actions & Minimal Permissions**
+  - Tap the bottom-right glass power/lock button to **Lock Screen** immediately (`GLOBAL_ACTION_LOCK_SCREEN` via minimal `canRetrieveWindowContent="false"` Accessibility Service—keeps Fingerprint & Face Unlock working), or use the `#000000` **OLED Calm Screen** fallback. Press and hold for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), and the **Guided Feature Tour**.
+  - Zero `INTERNET`, Device Admin, Notification Listener, or broad storage permissions.
 
 ---
 
@@ -83,7 +83,7 @@ Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOv
 3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
 4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
 5. **Smart Audio Media Capsule** — Space-reclaiming zero-permission playback card.
-6. **Lock / Calm Screen & Quick Actions** — Bottom-right power/lock button, `#000000` ambient calm screen, Screen Lock Settings, and hold-for-Quick-Actions menu.
+6. **One-Tap Lock & Quick Actions** — Bottom-right power/lock button (`GLOBAL_ACTION_LOCK_SCREEN`), OLED Calm Screen fallback, and hold-for-Quick-Actions menu.
 
 Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
 

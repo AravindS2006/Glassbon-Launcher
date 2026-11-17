@@ -39,13 +39,27 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on bottom-right Lock button enters Lock / Calm Screen; Quick Actions & Lock Settings are both accessible
+    // Single tap on bottom-right Lock button opens One-Tap Screen Lock Accessibility prompt when disabled
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("lock_open_app_info_button").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("lock_open_accessibility_button").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    val accessibilityIntent = shadowOf(composeTestRule.activity).nextStartedActivity
+    assertEquals(Settings.ACTION_ACCESSIBILITY_SETTINGS, accessibilityIntent?.action)
+    composeTestRule.onNodeWithTag("lock_permission_dialog").assertDoesNotExist()
+
+    // Fallback to OLED Calm Screen -> Quick Actions -> Lock Settings
+    composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_use_calm_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed()
     composeTestRule.onNodeWithTag("calm_quick_actions_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("qa_lock_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_calm_screen").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()

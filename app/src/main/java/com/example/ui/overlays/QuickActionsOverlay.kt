@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
@@ -63,7 +64,9 @@ import com.example.ui.theme.MistColors
 @Composable
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
+  isScreenLockEnabled: Boolean = false,
   reducedMotion: Boolean = false,
+  onLockScreen: () -> Unit,
   onOpenCalmScreen: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onOpenLibrary: () -> Unit,
@@ -138,6 +141,13 @@ fun QuickActionsOverlay(
 
         QuickActionRow(
           icon = Icons.Rounded.PowerSettingsNew,
+          label = stringResource(R.string.action_lock_screen),
+          badge = if (isScreenLockEnabled) "Ready" else "Setup",
+          testTag = "qa_lock_screen",
+          onClick = onLockScreen
+        )
+        QuickActionRow(
+          icon = Icons.Outlined.Bedtime,
           label = stringResource(R.string.action_calm_screen),
           testTag = "qa_calm_screen",
           onClick = onOpenCalmScreen
