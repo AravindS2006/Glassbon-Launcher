@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Glassbon</string>
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
-    <string name="cd_open_quick_actions">Open quick actions or hold for menu</string>
+    <string name="cd_open_quick_actions">Lock or calm screen, hold for quick actions</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_close_search">Close search</string>
@@ -23,7 +23,10 @@
     <string name="search_empty_subtitle">Try another name or clear your search.</string>
     <string name="favorites_section_title">Favorites</string>
     <string name="quick_actions_title">Quick Actions</string>
-    <string name="action_calm_screen">OLED Calm Screen</string>
+    <string name="action_calm_screen">Lock / Calm Screen</string>
+    <string name="action_quick_actions_short">Quick Actions</string>
+    <string name="action_lock_settings">Screen Lock Settings</string>
+    <string name="cd_calm_lock_settings">Open Screen Lock Settings</string>
     <string name="action_app_library">App Library</string>
     <string name="action_search_apps">Search Apps</string>
     <string name="action_wallpaper_studio">Wallpaper</string>

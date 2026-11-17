@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Rule
@@ -124,6 +126,34 @@ class DrawerAlphabetJumpRobolectricTest {
           .fetchSemanticsNodes().isNotEmpty()
       }
       composeTestRule.onNodeWithTag("drawer_section_G", useUnmergedTree = true).assertIsDisplayed()
+
+      // Continuous sideways + downward drag from B down toward Z moves smoothly without glitches
+      composeTestRule.onNodeWithTag("alphabet_rail").performTouchInput {
+        val startX = right - 10f
+        down(androidx.compose.ui.geometry.Offset(startX, height * 0.14f))
+        advanceEventTime(20L)
+        moveTo(androidx.compose.ui.geometry.Offset(startX - 48f, height * 0.48f))
+        advanceEventTime(20L)
+        moveTo(androidx.compose.ui.geometry.Offset(startX - 72f, height * 0.945f))
+        advanceEventTime(20L)
+        up()
+      }
+      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+        composeTestRule.onAllNodesWithTag("drawer_section_Z", useUnmergedTree = true)
+          .fetchSemanticsNodes().isNotEmpty()
+      }
+      composeTestRule.onNodeWithTag("drawer_section_Z", useUnmergedTree = true).assertIsDisplayed()
+
+      // Even while scrolled deep at section Z, swiping down on the drawer header returns to Home
+      composeTestRule.onNodeWithTag("drawer_close_handle").performTouchInput {
+        down(center)
+        moveBy(androidx.compose.ui.geometry.Offset(0f, 320f))
+        advanceEventTime(20L)
+        up()
+      }
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag("app_drawer_screen").assertDoesNotExist()
+      composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     }
   }
 }

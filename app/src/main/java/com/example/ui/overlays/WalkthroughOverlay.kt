@@ -34,10 +34,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -129,10 +129,10 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "Quick Actions & OLED Calm",
-    description = "Tap the floating glass control to summon Quick Actions—or set it to open OLED Calm Screen, Search, or App Library directly.",
-    tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside.",
-    icon = Icons.Outlined.Bedtime,
+    title = "Lock / Calm Screen & Quick Actions",
+    description = "Tap the floating power button for pure OLED Lock / Calm Screen with Screen Lock Settings—or press and hold anytime to summon Quick Actions.",
+    tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside Quick Actions.",
+    icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
 )
@@ -511,7 +511,7 @@ private fun SpatialAnchorBeacons(anchor: SpatialAnchor) {
 
       SpatialAnchor.BOTTOM_RIGHT -> {
         SpatialBeaconPill(
-          label = "Quick Actions · Calm Screen",
+          label = "Lock Button · Hold for Actions",
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 22.dp, bottom = 78.dp)

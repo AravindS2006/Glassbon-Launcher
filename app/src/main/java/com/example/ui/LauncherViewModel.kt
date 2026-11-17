@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
@@ -154,6 +155,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     onBufferOverflow = BufferOverflow.DROP_OLDEST
   )
   val drawerJumpEvents: SharedFlow<String> = _drawerJumpEvents.asSharedFlow()
+
+  private val _drawerContinuousScrubEvents = MutableSharedFlow<Float>(
+    extraBufferCapacity = 4,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+  val drawerContinuousScrubEvents: SharedFlow<Float> = _drawerContinuousScrubEvents.asSharedFlow()
 
   // Heavy grouping, row flattening & filtering run on Dispatchers.Default ONLY when apps or preferences change
   private val derivedAppsFlow = combine(
@@ -390,6 +397,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     _drawerJumpEvents.tryEmit(sectionKey)
   }
 
+  fun emitDrawerContinuousScrub(continuousIndex: Float) {
+    _drawerContinuousScrubEvents.tryEmit(continuousIndex)
+  }
+
   fun closeDrawer() {
     transientState.update {
       it.copy(
@@ -576,6 +587,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   fun openDeviceSettings() {
     SystemActionsHelper.openDeviceSettings(appContext)
     toggleQuickActions(false)
+  }
+
+  fun openLockScreenSettings(context: Context = appContext) {
+    if (!SystemActionsHelper.openLockScreenSettings(context)) {
+      transientState.update { it.copy(statusMessage = "Screen lock settings unavailable.") }
+    }
+    toggleQuickActions(false)
+    setAmbientCalmScreen(false)
   }
 
   fun applyPickedWallpaper(uri: Uri) {

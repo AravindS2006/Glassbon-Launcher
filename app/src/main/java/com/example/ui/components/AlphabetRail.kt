@@ -56,6 +56,7 @@ import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 const val FAVORITES_INDEX_KEY = "★"
@@ -79,6 +80,8 @@ fun AlphabetRail(
   useSansBubble: Boolean = true,
   isEdgeBright: Boolean = false,
   onDraggingChanged: (Boolean) -> Unit = {},
+  onDragPullChanged: (Float) -> Unit = {},
+  onContinuousScrub: ((Float) -> Unit)? = null,
   onDragEnd: () -> Unit = {}
 ) {
   val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
@@ -89,10 +92,12 @@ fun AlphabetRail(
   var isDragging by remember { mutableStateOf(false) }
   var isWaveVisible by remember(invisibleMode) { mutableStateOf(!invisibleMode) }
   val pointerYState = remember { mutableFloatStateOf(-1f) }
+  val dragPullTargetState = remember { mutableFloatStateOf(0f) }
   var lastSelectedIndex by remember { mutableIntStateOf(-1) }
   val scrubbedKeyState = remember { mutableStateOf<String?>(null) }
 
   val waveStrength = remember { Animatable(0f) }
+  val dragStretch = remember { Animatable(0f) }
 
   LaunchedEffect(isDragging, reducedMotion, invisibleMode) {
     onDraggingChanged(isDragging)
@@ -115,7 +120,7 @@ fun AlphabetRail(
       } else if (waveStrength.value > 0f) {
         waveStrength.animateTo(
           targetValue = 0f,
-          animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+          animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
         )
       }
       if (invisibleMode && !isDragging) {
@@ -124,25 +129,50 @@ fun AlphabetRail(
     }
   }
 
+  // Smooth elastic sideways pull damper for the wave arc (follows horizontal thumb drag smoothly)
+  LaunchedEffect(isDragging, dragPullTargetState.floatValue, reducedMotion) {
+    val target = if (isDragging) dragPullTargetState.floatValue else 0f
+    if (reducedMotion) {
+      dragStretch.snapTo(target)
+    } else {
+      dragStretch.animateTo(
+        targetValue = target,
+        animationSpec = spring(
+          dampingRatio = 0.72f,
+          stiffness = Spring.StiffnessMedium
+        )
+      )
+    }
+  }
+
   val isLeft = side == AlphabetRailSide.LEFT
   val dirSign = if (isLeft) 1f else -1f
   val verticalPadPx = with(density) { 4.dp.toPx() }
-  val maxCurvePx = with(density) { 40.dp.toPx() }
-  val sigmaPx = with(density) { 52.dp.toPx() }
+  val baseCurvePx = with(density) { 42.dp.toPx() }
+  val extraCurvePx = with(density) { 52.dp.toPx() }
+  val baseSigmaPx = with(density) { 54.dp.toPx() }
+  val extraSigmaPx = with(density) { 26.dp.toPx() }
+  val maxPullInputPx = with(density) { 96.dp.toPx() }
   val bubbleHalfSizePx = with(density) { 27.dp.toPx() }
   val bubbleBaseOffsetXPx = with(density) { 74.dp.roundToPx() }
-  val bubbleSwingXPx = with(density) { 16.dp.toPx() }
+  val bubbleSwingXPx = with(density) { 20.dp.toPx() }
+  val bubbleStretchXPx = with(density) { 46.dp.toPx() }
 
-  fun dispatchIndexForY(y: Float) {
+  fun dispatchContinuousForY(y: Float, emitSelect: Boolean, emitContinuous: Boolean) {
     val heightPx = railHeightPxState.intValue
     if (heightPx <= 0) return
     val maxY = (heightPx - verticalPadPx).coerceAtLeast(verticalPadPx)
     val clampedY = y.coerceIn(verticalPadPx, maxY)
     pointerYState.floatValue = clampedY
     val usableH = (heightPx - verticalPadPx * 2f).coerceAtLeast(1f)
-    val idx = (((clampedY - verticalPadPx) / usableH) * entries.size)
-      .toInt()
-      .coerceIn(0, entries.lastIndex)
+    val continuousIdx = (((clampedY - verticalPadPx) / usableH) * entries.size)
+      .coerceIn(0f, entries.size.toFloat())
+    val idx = continuousIdx.toInt().coerceIn(0, entries.lastIndex)
+
+    if (emitContinuous) {
+      onContinuousScrub?.invoke(continuousIdx)
+    }
+
     if (idx != lastSelectedIndex) {
       lastSelectedIndex = idx
       val selected = entries[idx]
@@ -150,7 +180,9 @@ fun AlphabetRail(
       if (hapticEnabled) {
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
       }
-      onSelectKey(selected)
+      if (emitSelect) {
+        onSelectKey(selected)
+      }
     }
   }
 
@@ -164,24 +196,27 @@ fun AlphabetRail(
       .width(42.dp),
     contentAlignment = containerAlign
   ) {
-    // Unified zero-slop pointer handler with stationary tap stabilization & full-height 1:1 coordinate mapping
+    // Unified pointer handler supporting sideways elastic stretch + continuous pixel scrubbing
     Box(
       modifier = Modifier
         .align(containerAlign)
         .width(touchWidth)
         .fillMaxHeight()
         .onSizeChanged { railHeightPxState.intValue = it.height }
-        .pointerInput(entries) {
+        .pointerInput(entries, isLeft) {
           val touchSlopPx = viewConfiguration.touchSlop
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             down.consume()
+            val downX = down.position.x
             val downY = down.position.y
             var scrubUnlocked = false
             lastSelectedIndex = -1
             isDragging = true
             isWaveVisible = true
-            dispatchIndexForY(downY)
+            dragPullTargetState.floatValue = 0f
+            onDragPullChanged(0f)
+            dispatchContinuousForY(downY, emitSelect = true, emitContinuous = false)
 
             while (true) {
               val event = awaitPointerEvent()
@@ -191,15 +226,31 @@ fun AlphabetRail(
                 break
               }
               change.consume()
-              if (!scrubUnlocked && abs(change.position.y - downY) >= touchSlopPx) {
+
+              val inwardDx = if (isLeft) {
+                (change.position.x - downX).coerceAtLeast(0f)
+              } else {
+                (downX - change.position.x).coerceAtLeast(0f)
+              }
+              val pullRatio = (inwardDx / maxPullInputPx).coerceIn(0f, 1f)
+              dragPullTargetState.floatValue = pullRatio
+              onDragPullChanged(pullRatio)
+
+              if (!scrubUnlocked && hypot(change.position.x - downX, change.position.y - downY) >= touchSlopPx) {
                 scrubUnlocked = true
               }
               if (scrubUnlocked) {
-                dispatchIndexForY(change.position.y)
+                dispatchContinuousForY(
+                  y = change.position.y,
+                  emitSelect = onContinuousScrub == null,
+                  emitContinuous = onContinuousScrub != null
+                )
               }
             }
 
             isDragging = false
+            dragPullTargetState.floatValue = 0f
+            onDragPullChanged(0f)
             lastSelectedIndex = -1
             scrubbedKeyState.value = null
             onDragEnd()
@@ -211,13 +262,14 @@ fun AlphabetRail(
       AlphabetWaveBubble(
         bubbleKeyProvider = { scrubbedKeyState.value ?: activeKeyProvider() },
         waveStrengthProvider = { waveStrength.value },
+        dragStretchProvider = { dragStretch.value },
         pointerYProvider = { pointerYState.floatValue },
         railHeightProvider = { railHeightPxState.intValue.toFloat() },
-        isLeft = isLeft,
         dirSign = dirSign,
         bubbleHalfSizePx = bubbleHalfSizePx,
         bubbleBaseOffsetXPx = bubbleBaseOffsetXPx,
         bubbleSwingXPx = bubbleSwingXPx,
+        bubbleStretchXPx = bubbleStretchXPx,
         useSansBubble = useSansBubble,
         modifier = Modifier.align(if (isLeft) Alignment.TopStart else Alignment.TopEnd)
       )
@@ -231,11 +283,14 @@ fun AlphabetRail(
         useDarkIdleInk = isEdgeBright && !invisibleMode,
         dirSign = dirSign,
         verticalPadPx = verticalPadPx,
-        maxCurvePx = maxCurvePx,
-        sigmaPx = sigmaPx,
+        baseCurvePx = baseCurvePx,
+        extraCurvePx = extraCurvePx,
+        baseSigmaPx = baseSigmaPx,
+        extraSigmaPx = extraSigmaPx,
         activeKeyProvider = activeKeyProvider,
         isDraggingProvider = { isDragging },
         waveStrengthProvider = { waveStrength.value },
+        dragStretchProvider = { dragStretch.value },
         pointerYProvider = { pointerYState.floatValue },
         railHeightProvider = { railHeightPxState.intValue.toFloat() },
         modifier = Modifier
@@ -252,13 +307,14 @@ fun AlphabetRail(
 private fun AlphabetWaveBubble(
   bubbleKeyProvider: () -> String?,
   waveStrengthProvider: () -> Float,
+  dragStretchProvider: () -> Float,
   pointerYProvider: () -> Float,
   railHeightProvider: () -> Float,
-  isLeft: Boolean,
   dirSign: Float,
   bubbleHalfSizePx: Float,
   bubbleBaseOffsetXPx: Int,
   bubbleSwingXPx: Float,
+  bubbleStretchXPx: Float,
   useSansBubble: Boolean,
   modifier: Modifier = Modifier
 ) {
@@ -276,13 +332,15 @@ private fun AlphabetWaveBubble(
           0f
         }
         val w = waveStrengthProvider()
-        val x = ((bubbleBaseOffsetXPx + (bubbleSwingXPx * w)) * dirSign).roundToInt()
+        val stretch = dragStretchProvider()
+        val x = ((bubbleBaseOffsetXPx + (bubbleSwingXPx * w) + (bubbleStretchXPx * stretch)) * dirSign).roundToInt()
         IntOffset(x = x, y = y.roundToInt())
       }
       .graphicsLayer {
         val w = waveStrengthProvider()
+        val stretch = dragStretchProvider()
         alpha = w
-        val s = 0.72f + (0.28f * w)
+        val s = 0.72f + (0.28f * w) + (0.08f * stretch)
         scaleX = s
         scaleY = s
       }
@@ -322,11 +380,14 @@ private fun AlphabetLetterColumn(
   useDarkIdleInk: Boolean,
   dirSign: Float,
   verticalPadPx: Float,
-  maxCurvePx: Float,
-  sigmaPx: Float,
+  baseCurvePx: Float,
+  extraCurvePx: Float,
+  baseSigmaPx: Float,
+  extraSigmaPx: Float,
   activeKeyProvider: () -> String?,
   isDraggingProvider: () -> Boolean,
   waveStrengthProvider: () -> Float,
+  dragStretchProvider: () -> Float,
   pointerYProvider: () -> Float,
   railHeightProvider: () -> Float,
   modifier: Modifier = Modifier
@@ -356,13 +417,16 @@ private fun AlphabetLetterColumn(
             val w = waveStrengthProvider()
             val py = pointerYProvider()
             val h = railHeightProvider()
+            val stretch = dragStretchProvider()
             if (w > 0.001f && py >= 0f && h > 0f) {
               val usableH = (h - verticalPadPx * 2f).coerceAtLeast(1f)
               val letterCenterY = verticalPadPx + ((index + 0.5f) / entryCount) * usableH
               val dist = abs(letterCenterY - py)
-              val gaussian = exp(-(dist * dist) / (2f * sigmaPx * sigmaPx))
-              translationX = dirSign * maxCurvePx * gaussian * w
-              val s = 1f + (0.44f * gaussian * w)
+              val sigma = baseSigmaPx + (extraSigmaPx * stretch)
+              val gaussian = exp(-(dist * dist) / (2f * sigma * sigma))
+              val curve = baseCurvePx + (extraCurvePx * stretch)
+              translationX = dirSign * curve * gaussian * w
+              val s = 1f + ((0.44f + 0.16f * stretch) * gaussian * w)
               scaleX = s
               scaleY = s
               alpha = if (invisibleMode) w else (0.76f + 0.24f * gaussian * w)

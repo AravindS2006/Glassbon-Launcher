@@ -1,5 +1,6 @@
 package com.example
 
+import android.provider.Settings
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -10,10 +11,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -33,14 +37,21 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap opens Quick Actions Panel; OLED Calm Screen enters and exits cleanly
+    // Single tap on bottom-right Lock button enters Lock / Calm Screen; Quick Actions & Lock Settings are both accessible
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("calm_quick_actions_button").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_calm_screen").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed().performClick()
+    composeTestRule.onNodeWithTag("ambient_calm_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("calm_lock_settings_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
+    val startedIntent = shadowOf(composeTestRule.activity).nextStartedActivity
+    assertEquals(Settings.ACTION_SECURITY_SETTINGS, startedIntent?.action)
     composeTestRule.onNodeWithTag("ambient_calm_overlay").assertDoesNotExist()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
   }
@@ -84,15 +95,18 @@ class LauncherUiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
 
-    // Hidden left-edge alphabet rail also opens the drawer cleanly when tapped/scrubbed
+    // Hidden left-edge alphabet rail opens drawer, and swiping down inside the drawer returns to Home
     composeTestRule.onNodeWithTag("home_left_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("left_alphabet_rail").performTouchInput {
       click(centerLeft)
     }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("app_drawer_screen").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("drawer_close_handle").performClick()
+    composeTestRule.onNodeWithTag("drawer_app_list").performTouchInput {
+      swipeDown()
+    }
     composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("app_drawer_screen").assertDoesNotExist()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
   }
 

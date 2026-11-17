@@ -82,6 +82,7 @@ fun SettingsScreen(
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
+  onOpenLockScreenSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
   onClose: () -> Unit
@@ -245,7 +246,7 @@ fun SettingsScreen(
           )
           DividerLine()
           SegmentedPreferenceRow(
-            title = "Bottom-Right Action Button Tap",
+            title = "Bottom-Right Lock Button Tap",
             options = QuickActionMode.entries,
             selected = prefs.quickActionMode,
             label = { it.displayName },
@@ -291,6 +292,13 @@ fun SettingsScreen(
 
         // SYSTEM INTEGRATION (ZERO SENSITIVE PERMISSIONS)
         SectionBlock(title = "System Integration") {
+          NavigationPreferenceRow(
+            title = "Screen Lock & Security Settings",
+            subtitle = "Open Android Lock Screen, PIN & display timeout settings",
+            testTag = "settings_screen_lock_row",
+            onClick = onOpenLockScreenSettings
+          )
+          DividerLine()
           NavigationPreferenceRow(
             title = "Default Home Application",
             subtitle = if (uiState.isDefaultLauncher) "Glassbon is currently default" else "Tap to set Glassbon as default Home",

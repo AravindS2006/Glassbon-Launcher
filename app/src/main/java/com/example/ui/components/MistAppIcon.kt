@@ -45,14 +45,17 @@ fun MistAppIcon(
   highContrastBackdrop: Boolean = false
 ) {
   val cached = iconCache.getCached(app.componentKey, iconStyle)
-  val iconBitmap by produceState<ImageBitmap?>(
-    initialValue = cached,
-    key1 = app.componentKey,
-    key2 = iconStyle
-  ) {
-    if (value == null) {
+  val iconBitmap: ImageBitmap? = if (cached != null) {
+    cached
+  } else {
+    val produced by produceState<ImageBitmap?>(
+      initialValue = null,
+      key1 = app.componentKey,
+      key2 = iconStyle
+    ) {
       value = iconCache.loadIcon(app, iconStyle)
     }
+    produced
   }
 
   val isGlassMono = iconStyle == IconStyle.DOT_MONO

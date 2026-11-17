@@ -32,7 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -80,6 +80,8 @@ fun HomeScreen(
   iconCache: AppIconCache,
   drawerProgressProvider: () -> Float,
   onScrubToDrawerSection: (String, AlphabetRailSide) -> Unit,
+  onScrubPullChanged: (Float) -> Unit = {},
+  onContinuousScrub: ((Float) -> Unit)? = null,
   onScrubDragEnd: () -> Unit,
   onLaunchApp: (AppInfo) -> Unit,
   onLongPressApp: (AppInfo) -> Unit,
@@ -277,6 +279,8 @@ fun HomeScreen(
           reducedMotion = prefs.effectiveReducedMotion,
           useSansBubble = useSans,
           onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.LEFT) },
+          onDragPullChanged = onScrubPullChanged,
+          onContinuousScrub = onContinuousScrub,
           onDragEnd = onScrubDragEnd
         )
       }
@@ -302,6 +306,8 @@ fun HomeScreen(
         useSansBubble = useSans,
         isEdgeBright = uiState.wallpaper.isEdgesBright,
         onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.RIGHT) },
+        onDragPullChanged = onScrubPullChanged,
+        onContinuousScrub = onContinuousScrub,
         onDragEnd = onScrubDragEnd
       )
     }
@@ -391,9 +397,9 @@ fun HomeScreen(
       }
     }
 
-    // Bottom-right floating glass Quick Actions control (Tap = Configured Quick Action, Long-press = Quick Actions menu)
+    // Bottom-right floating glass Lock / Calm button (Tap = Configured Quick Action, Long-press = Quick Actions menu)
     FloatingCircleButton(
-      icon = Icons.Rounded.Tune,
+      icon = Icons.Rounded.PowerSettingsNew,
       contentDescription = stringResource(R.string.cd_open_quick_actions),
       testTag = "home_quick_actions_button",
       onClick = onPowerButtonTap,

@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -56,19 +58,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -79,10 +91,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.data.apps.AppIndexHelper
 import com.example.data.apps.AppInfo
 import com.example.data.preferences.TypographyStyle
 import com.example.ui.DrawerRowItem
@@ -97,19 +111,25 @@ import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
-import androidx.compose.runtime.snapshotFlow
 import com.example.ui.theme.appLabelTextStyle
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.roundToInt
 
 @Composable
 fun AppDrawerScreen(
   uiState: LauncherUiState,
   iconCache: AppIconCache,
   drawerJumpEvents: SharedFlow<String>,
+  drawerContinuousScrubEvents: SharedFlow<Float> = remember { MutableSharedFlow() },
   hideRightAlphabetRail: Boolean = false,
   hideLeftAlphabetRail: Boolean = false,
+  homeScrubPullProvider: () -> Float = { 0f },
   onJumpTargetHandled: () -> Unit = {},
   onLaunchApp: (AppInfo) -> Unit,
   onLongPressApp: (AppInfo) -> Unit,
@@ -120,15 +140,19 @@ fun AppDrawerScreen(
 ) {
   val prefs = uiState.preferences
   val listState = rememberLazyListState()
+  val searchListState = rememberLazyListState()
   val coroutineScope = rememberCoroutineScope()
   val focusManager = LocalFocusManager.current
   val keyboardController = LocalSoftwareKeyboardController.current
   val density = LocalDensity.current
 
-  // Niagara-style smooth horizontal glide away from the active thumb edge (zero per-letter snap resets)
+  // Smooth elastic horizontal glide away from the active thumb edge synced with sideways pull
   var draggingSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
+  val drawerScrubPullState = remember { mutableFloatStateOf(0f) }
   val listDragShiftX = remember { Animatable(0f) }
-  val dragPullPx = with(density) { 12.dp.toPx() }
+  val baseShiftPx = with(density) { 14.dp.toPx() }
+  val extraShiftPx = with(density) { 26.dp.toPx() }
+  val defaultRowHeightPx = with(density) { 56.dp.toPx() }
 
   val effectiveSide = when {
     hideRightAlphabetRail -> AlphabetRailSide.RIGHT
@@ -138,23 +162,153 @@ fun AppDrawerScreen(
 
   val effectiveReducedMotion = prefs.effectiveReducedMotion
   val effectiveLowEffects = prefs.effectiveLowEffects
+  val isScrubbingAnyEdge = effectiveSide != null
+
+  // Physical swipe-down-to-home state (from top of list or from header handle at any scroll depth)
+  val pullDownOffset = remember { Animatable(0f) }
+  val dismissThresholdPx = with(density) { 64.dp.toPx() }
+  val maxPullPx = with(density) { 260.dp.toPx() }
+  val flingVelocityThresholdPx = with(density) { 450.dp.toPx() }
+
+  LaunchedEffect(uiState.isDrawerOpen) {
+    pullDownOffset.snapTo(0f)
+  }
+
+  val currentIsScrubbing by rememberUpdatedState(isScrubbingAnyEdge)
+  val currentIsSearchActive by rememberUpdatedState(uiState.isSearchActive)
+  val currentReducedMotion by rememberUpdatedState(effectiveReducedMotion)
+  val currentOnCloseDrawer by rememberUpdatedState(onCloseDrawer)
+
+  fun settlePullOrDismiss(velocityY: Float) {
+    if (pullDownOffset.value >= dismissThresholdPx ||
+      (pullDownOffset.value > 16f && velocityY >= flingVelocityThresholdPx)
+    ) {
+      if (currentIsSearchActive) {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+      }
+      currentOnCloseDrawer()
+    } else if (pullDownOffset.value > 0f) {
+      coroutineScope.launch {
+        if (currentReducedMotion) {
+          pullDownOffset.snapTo(0f)
+        } else {
+          pullDownOffset.animateTo(
+            targetValue = 0f,
+            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMedium)
+          )
+        }
+      }
+    }
+  }
+
+  val drawerDismissNestedScroll = remember(
+    listState,
+    searchListState,
+    dismissThresholdPx,
+    maxPullPx,
+    flingVelocityThresholdPx
+  ) {
+    object : NestedScrollConnection {
+      override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput && pullDownOffset.value > 0f && available.y < 0f) {
+          val current = pullDownOffset.value
+          val next = (current + available.y).coerceAtLeast(0f)
+          val consumedY = next - current
+          coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            pullDownOffset.snapTo(next)
+          }
+          return Offset(0f, consumedY)
+        }
+        return Offset.Zero
+      }
+
+      override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource
+      ): Offset {
+        val activeCanScrollBackward = if (currentIsSearchActive) {
+          searchListState.canScrollBackward
+        } else {
+          listState.canScrollBackward
+        }
+        if (source == NestedScrollSource.UserInput &&
+          !currentIsScrubbing &&
+          !activeCanScrollBackward &&
+          available.y > 0f
+        ) {
+          val next = (pullDownOffset.value + available.y * 0.85f).coerceIn(0f, maxPullPx)
+          coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            pullDownOffset.snapTo(next)
+          }
+          return Offset(0f, available.y)
+        }
+        return Offset.Zero
+      }
+
+      override suspend fun onPreFling(available: Velocity): Velocity {
+        if (pullDownOffset.value > 0f) {
+          settlePullOrDismiss(available.y)
+          return available
+        }
+        return Velocity.Zero
+      }
+    }
+  }
+
+  val headerPullModifier = Modifier.pointerInput(dismissThresholdPx, maxPullPx, flingVelocityThresholdPx) {
+    val velocityTracker = VelocityTracker()
+    detectVerticalDragGestures(
+      onDragStart = { velocityTracker.resetTracking() },
+      onVerticalDrag = { change, dragAmount ->
+        velocityTracker.addPosition(change.uptimeMillis, change.position)
+        val next = (pullDownOffset.value + dragAmount * 0.85f).coerceIn(0f, maxPullPx)
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+          pullDownOffset.snapTo(next)
+        }
+        change.consume()
+      },
+      onDragEnd = {
+        settlePullOrDismiss(velocityTracker.calculateVelocity().y)
+      },
+      onDragCancel = {
+        settlePullOrDismiss(0f)
+      }
+    )
+  }
 
   LaunchedEffect(effectiveSide, effectiveReducedMotion) {
-    val targetShift = when {
-      effectiveReducedMotion || effectiveSide == null -> 0f
-      effectiveSide == AlphabetRailSide.RIGHT -> -dragPullPx
-      else -> dragPullPx
-    }
-    if (effectiveReducedMotion) {
-      listDragShiftX.snapTo(0f)
-    } else {
-      listDragShiftX.animateTo(
-        targetValue = targetShift,
-        animationSpec = spring(
-          dampingRatio = 0.88f,
-          stiffness = Spring.StiffnessMediumLow
+    if (effectiveReducedMotion || effectiveSide == null) {
+      if (effectiveReducedMotion) {
+        listDragShiftX.snapTo(0f)
+      } else {
+        listDragShiftX.animateTo(
+          targetValue = 0f,
+          animationSpec = spring(
+            dampingRatio = 0.84f,
+            stiffness = Spring.StiffnessMediumLow
+          )
         )
-      )
+      }
+    } else {
+      val dirSign = if (effectiveSide == AlphabetRailSide.RIGHT) -1f else 1f
+      snapshotFlow {
+        val pull = if (hideRightAlphabetRail || hideLeftAlphabetRail) {
+          homeScrubPullProvider()
+        } else {
+          drawerScrubPullState.floatValue
+        }
+        dirSign * (baseShiftPx + extraShiftPx * pull)
+      }.collect { targetShift ->
+        listDragShiftX.animateTo(
+          targetValue = targetShift,
+          animationSpec = spring(
+            dampingRatio = 0.80f,
+            stiffness = Spring.StiffnessMedium
+          )
+        )
+      }
     }
   }
 
@@ -169,13 +323,20 @@ fun AppDrawerScreen(
   }
 
   val sectionIndexMap = uiState.sectionIndexMap
+  val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
+  val rowAnchors = remember(entries, sectionIndexMap, uiState.drawerRows.size) {
+    buildContinuousRowAnchors(entries, sectionIndexMap, uiState.drawerRows.size)
+  }
+
   var pinnedJumpKey by remember { mutableStateOf<String?>(null) }
+  val targetContinuousRowState = remember { mutableFloatStateOf(-1f) }
 
   // Clear pinned section highlight as soon as user manually drags the app list
   LaunchedEffect(listState) {
     listState.interactionSource.interactions.collect { interaction ->
       if (interaction is DragInteraction.Start) {
         pinnedJumpKey = null
+        targetContinuousRowState.floatValue = -1f
       }
     }
   }
@@ -192,18 +353,82 @@ fun AppDrawerScreen(
           .first { it > index }
       }
       pinnedJumpKey = resolved.first
+      targetContinuousRowState.floatValue = -1f
       listState.scrollToItem(index, scrollOffset = 0)
     }
     onJumpTargetHandled()
   }
 
-  // Imperative continuous scrub jumps while dragging from Home's Alphabet Rail (0 recompositions!)
+  // Discrete jump events (taps on Home rail when drawer is open)
   LaunchedEffect(drawerJumpEvents, sectionIndexMap) {
     drawerJumpEvents.collect { target ->
       val resolved = findNearestSection(target, sectionIndexMap)
       if (resolved != null) {
         pinnedJumpKey = resolved.first
+        targetContinuousRowState.floatValue = -1f
         listState.scrollToItem(resolved.second, scrollOffset = 0)
+      }
+    }
+  }
+
+  // Continuous scrub stream from Home rail -> updates lock-free float target
+  LaunchedEffect(drawerContinuousScrubEvents, rowAnchors) {
+    drawerContinuousScrubEvents.collect { continuousIdx ->
+      if (uiState.drawerRows.isNotEmpty()) {
+        pinnedJumpKey = null
+        targetContinuousRowState.floatValue = resolveContinuousRow(continuousIdx, rowAnchors, uiState.drawerRows.size)
+      }
+    }
+  }
+
+  // Vsync-paced frame follower: smoothly interpolates LazyColumn item + pixel offset at 60-120Hz while dragging
+  LaunchedEffect(isScrubbingAnyEdge, effectiveReducedMotion, uiState.drawerRows.size) {
+    if (!isScrubbingAnyEdge || uiState.drawerRows.isEmpty()) return@LaunchedEffect
+
+    var smoothedRow = -1f
+    var lastFrameNanos = 0L
+
+    while (true) {
+      var pendingScroll: Pair<Int, Int>? = null
+      withFrameNanos { frameNanos ->
+        val target = targetContinuousRowState.floatValue
+        if (target >= 0f) {
+          val visibleInfo = listState.layoutInfo.visibleItemsInfo
+          val avgRowPx = if (visibleInfo.isNotEmpty()) {
+            (visibleInfo.sumOf { it.size }.toFloat() / visibleInfo.size).coerceAtLeast(1f)
+          } else {
+            defaultRowHeightPx
+          }
+          val maxRow = (uiState.drawerRows.size - 1).coerceAtLeast(0).toFloat()
+          val clampedTarget = target.coerceIn(0f, maxRow)
+
+          if (effectiveReducedMotion) {
+            smoothedRow = clampedTarget
+          } else {
+            if (smoothedRow < 0f) {
+              smoothedRow = (listState.firstVisibleItemIndex +
+                (listState.firstVisibleItemScrollOffset / avgRowPx)).coerceIn(0f, maxRow)
+            }
+            val dt = if (lastFrameNanos == 0L) 0.016f else {
+              ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
+            }
+            val factor = 1f - exp(-26f * dt)
+            smoothedRow += (clampedTarget - smoothedRow) * factor
+            if (abs(clampedTarget - smoothedRow) < 0.005f) {
+              smoothedRow = clampedTarget
+            }
+          }
+          lastFrameNanos = frameNanos
+
+          val itemIndex = smoothedRow.toInt().coerceIn(0, uiState.drawerRows.lastIndex)
+          val offsetPx = ((smoothedRow - itemIndex) * avgRowPx).roundToInt().coerceAtLeast(0)
+          pendingScroll = itemIndex to offsetPx
+        } else {
+          lastFrameNanos = frameNanos
+        }
+      }
+      pendingScroll?.let { (itemIndex, offsetPx) ->
+        listState.scrollToItem(itemIndex, offsetPx)
       }
     }
   }
@@ -247,11 +472,23 @@ fun AppDrawerScreen(
       .windowInsetsPadding(WindowInsets.navigationBars)
       .imePadding()
   ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .nestedScroll(drawerDismissNestedScroll)
+        .graphicsLayer {
+          val dy = pullDownOffset.value
+          if (dy > 0f) {
+            translationY = dy
+            alpha = (1f - (dy / (dismissThresholdPx * 3f))).coerceIn(0.65f, 1f)
+          }
+        }
+    ) {
       AnimatedContent(
         targetState = uiState.isSearchActive,
         transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(110)) },
-        label = "drawer_header_transition"
+        label = "drawer_header_transition",
+        modifier = headerPullModifier
       ) { searching ->
         if (searching) {
           DrawerSearchHeader(
@@ -316,6 +553,8 @@ fun AppDrawerScreen(
             query = uiState.searchQuery,
             uiState = uiState,
             iconCache = iconCache,
+            listState = searchListState,
+            emptyStatePullModifier = headerPullModifier,
             onLaunchApp = { app ->
               keyboardController?.hide()
               onLaunchApp(app)
@@ -402,11 +641,23 @@ fun AppDrawerScreen(
                 useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.LEFT else null
+                  if (!dragging) drawerScrubPullState.floatValue = 0f
+                },
+                onDragPullChanged = { pull ->
+                  drawerScrubPullState.floatValue = pull
+                },
+                onContinuousScrub = { continuousIdx ->
+                  if (uiState.drawerRows.isNotEmpty()) {
+                    pinnedJumpKey = null
+                    targetContinuousRowState.floatValue =
+                      resolveContinuousRow(continuousIdx, rowAnchors, uiState.drawerRows.size)
+                  }
                 },
                 onSelectKey = { targetKey ->
                   val resolved = findNearestSection(targetKey, sectionIndexMap)
                   if (resolved != null) {
                     pinnedJumpKey = resolved.first
+                    targetContinuousRowState.floatValue = resolved.second.toFloat()
                     coroutineScope.launch { listState.scrollToItem(resolved.second, scrollOffset = 0) }
                   }
                 }
@@ -433,11 +684,23 @@ fun AppDrawerScreen(
                 useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.RIGHT else null
+                  if (!dragging) drawerScrubPullState.floatValue = 0f
+                },
+                onDragPullChanged = { pull ->
+                  drawerScrubPullState.floatValue = pull
+                },
+                onContinuousScrub = { continuousIdx ->
+                  if (uiState.drawerRows.isNotEmpty()) {
+                    pinnedJumpKey = null
+                    targetContinuousRowState.floatValue =
+                      resolveContinuousRow(continuousIdx, rowAnchors, uiState.drawerRows.size)
+                  }
                 },
                 onSelectKey = { targetKey ->
                   val resolved = findNearestSection(targetKey, sectionIndexMap)
                   if (resolved != null) {
                     pinnedJumpKey = resolved.first
+                    targetContinuousRowState.floatValue = resolved.second.toFloat()
                     coroutineScope.launch { listState.scrollToItem(resolved.second, scrollOffset = 0) }
                   }
                 }
@@ -462,6 +725,60 @@ fun AppDrawerScreen(
       )
     }
   }
+}
+
+private fun buildContinuousRowAnchors(
+  entries: List<String>,
+  sectionIndexMap: Map<String, Int>,
+  totalRows: Int
+): FloatArray {
+  val anchors = FloatArray(entries.size + 1)
+  if (totalRows <= 0 || sectionIndexMap.isEmpty()) return anchors
+
+  val known = FloatArray(entries.size) { Float.NaN }
+  for (i in entries.indices) {
+    val idx = sectionIndexMap[entries[i]]
+    if (idx != null) {
+      known[i] = idx.toFloat()
+    }
+  }
+  if (known[0].isNaN()) known[0] = 0f
+
+  var lastIdx = 0
+  var i = 1
+  while (i < entries.size) {
+    if (!known[i].isNaN()) {
+      val startVal = known[lastIdx]
+      val endVal = known[i]
+      val span = i - lastIdx
+      for (k in lastIdx..i) {
+        anchors[k] = startVal + ((k - lastIdx).toFloat() / span) * (endVal - startVal)
+      }
+      lastIdx = i
+    }
+    i++
+  }
+
+  val tailStart = known[lastIdx]
+  val endRow = (totalRows - 1).coerceAtLeast(0).toFloat()
+  val tailSpan = (entries.size - lastIdx).coerceAtLeast(1)
+  for (k in lastIdx..entries.size) {
+    anchors[k] = tailStart + ((k - lastIdx).toFloat() / tailSpan) * (endRow - tailStart)
+  }
+  return anchors
+}
+
+private fun resolveContinuousRow(
+  continuousIdx: Float,
+  anchors: FloatArray,
+  totalRows: Int
+): Float {
+  if (totalRows <= 1 || anchors.size < 2) return 0f
+  val maxEntry = (anchors.size - 2).coerceAtLeast(0)
+  val i = continuousIdx.toInt().coerceIn(0, maxEntry)
+  val frac = (continuousIdx - i).coerceIn(0f, 1f)
+  return (anchors[i] + frac * (anchors[i + 1] - anchors[i]))
+    .coerceIn(0f, (totalRows - 1).toFloat())
 }
 
 private fun findNearestSection(
@@ -657,6 +974,8 @@ private fun SearchResultsList(
   query: String,
   uiState: LauncherUiState,
   iconCache: AppIconCache,
+  listState: LazyListState,
+  emptyStatePullModifier: Modifier = Modifier,
   onLaunchApp: (AppInfo) -> Unit,
   onLongPressApp: (AppInfo) -> Unit
 ) {
@@ -665,6 +984,7 @@ private fun SearchResultsList(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .then(emptyStatePullModifier)
         .padding(horizontal = 32.dp)
         .testTag("search_empty_state"),
       verticalArrangement = Arrangement.Center,
@@ -704,6 +1024,7 @@ private fun SearchResultsList(
     val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
 
     LazyColumn(
+      state = listState,
       modifier = Modifier
         .fillMaxSize()
         .testTag("search_results_list"),

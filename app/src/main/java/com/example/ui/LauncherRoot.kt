@@ -14,17 +14,21 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -68,8 +73,10 @@ fun LauncherRoot(
   onLightStatusBarChanged: (Boolean) -> Unit
 ) {
   val prefs = uiState.preferences
+  val context = LocalContext.current
   val clockSnapshot = rememberSystemClockSnapshot()
   var activeHomeScrubSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
+  val homeScrubPullRatio = remember { mutableFloatStateOf(0f) }
 
   val isOverlayBlockingLightTop = uiState.isDrawerOpen ||
     uiState.showQuickActions ||
@@ -184,8 +191,10 @@ fun LauncherRoot(
         uiState = uiState,
         iconCache = iconCache,
         drawerJumpEvents = viewModel.drawerJumpEvents,
+        drawerContinuousScrubEvents = viewModel.drawerContinuousScrubEvents,
         hideRightAlphabetRail = activeHomeScrubSide == AlphabetRailSide.RIGHT,
         hideLeftAlphabetRail = activeHomeScrubSide == AlphabetRailSide.LEFT,
+        homeScrubPullProvider = { homeScrubPullRatio.floatValue },
         onJumpTargetHandled = { viewModel.updateDrawerJumpTarget(null) },
         onLaunchApp = { viewModel.launchApp(it) },
         onLongPressApp = { viewModel.openContextMenu(it) },
@@ -215,8 +224,15 @@ fun LauncherRoot(
             viewModel.openDrawer(withSearch = false, jumpToSection = key)
           }
         },
+        onScrubPullChanged = { pull ->
+          homeScrubPullRatio.floatValue = pull
+        },
+        onContinuousScrub = { continuousIdx ->
+          viewModel.emitDrawerContinuousScrub(continuousIdx)
+        },
         onScrubDragEnd = {
           activeHomeScrubSide = null
+          homeScrubPullRatio.floatValue = 0f
         },
         onLaunchApp = { viewModel.launchApp(it) },
         onLongPressApp = { viewModel.openContextMenu(it) },
@@ -263,6 +279,7 @@ fun LauncherRoot(
         onOpenWallpaperStudio = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavoritesManager = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenHiddenApps = { viewModel.openOverlay(LauncherOverlay.HIDDEN_APPS) },
+        onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartWalkthrough = { viewModel.startWalkthrough() },
         onClose = { viewModel.closeOverlay() }
@@ -323,6 +340,7 @@ fun LauncherRoot(
         isDefaultLauncher = uiState.isDefaultLauncher,
         reducedMotion = prefs.effectiveReducedMotion,
         onOpenCalmScreen = { viewModel.setAmbientCalmScreen(true) },
+        onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
         onOpenWallpaper = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
@@ -338,7 +356,7 @@ fun LauncherRoot(
       )
     }
 
-    // 7. Pure #000000 OLED Calm Screen (Zero-permission visual sanctuary)
+    // 7. Pure #000000 OLED Calm Screen (Zero-permission visual sanctuary + direct Lock Settings shortcut)
     AnimatedVisibility(
       visible = uiState.showAmbientCalmScreen,
       enter = fadeIn(tween(quickDuration)),
@@ -347,6 +365,8 @@ fun LauncherRoot(
       AmbientCalmOverlay(
         clockSnapshot = clockSnapshot,
         showClock = prefs.showClock,
+        onOpenQuickActions = { viewModel.toggleQuickActions(true) },
+        onOpenLockSettings = { viewModel.openLockScreenSettings(context) },
         onDismiss = { viewModel.setAmbientCalmScreen(false) }
       )
     }
@@ -426,6 +446,8 @@ private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
 private fun AmbientCalmOverlay(
   clockSnapshot: ClockSnapshot,
   showClock: Boolean,
+  onOpenQuickActions: () -> Unit,
+  onOpenLockSettings: () -> Unit,
   onDismiss: () -> Unit
 ) {
   BackHandler(onBack = onDismiss)
@@ -439,13 +461,14 @@ private fun AmbientCalmOverlay(
         indication = null,
         onClick = onDismiss
       )
-      .testTag("ambient_calm_overlay"),
-    contentAlignment = Alignment.Center
+      .testTag("ambient_calm_overlay")
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center,
-      modifier = Modifier.padding(32.dp)
+      modifier = Modifier
+        .align(Alignment.Center)
+        .padding(32.dp)
     ) {
       if (showClock) {
         Text(
@@ -463,6 +486,42 @@ private fun AmbientCalmOverlay(
         letterSpacing = 0.6.sp,
         color = Color(0x24FFFFFF)
       )
+    }
+
+    Row(
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+        .align(Alignment.BottomCenter)
+        .navigationBarsPadding()
+        .padding(bottom = 18.dp, start = 16.dp, end = 16.dp)
+    ) {
+      TextButton(
+        onClick = onOpenQuickActions,
+        modifier = Modifier
+          .heightIn(min = 48.dp)
+          .testTag("calm_quick_actions_button")
+      ) {
+        Text(
+          text = stringResource(R.string.action_quick_actions_short),
+          fontFamily = FunctionalSansFontFamily,
+          fontSize = 12.sp,
+          color = Color(0x48FFFFFF)
+        )
+      }
+      TextButton(
+        onClick = onOpenLockSettings,
+        modifier = Modifier
+          .heightIn(min = 48.dp)
+          .testTag("calm_lock_settings_button")
+      ) {
+        Text(
+          text = stringResource(R.string.action_lock_settings),
+          fontFamily = FunctionalSansFontFamily,
+          fontSize = 12.sp,
+          color = Color(0x48FFFFFF)
+        )
+      }
     }
   }
 }

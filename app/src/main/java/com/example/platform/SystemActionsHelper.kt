@@ -41,6 +41,21 @@ object SystemActionsHelper {
     }
   }
 
+  fun openLockScreenSettings(context: Context): Boolean {
+    val candidates = listOf(
+      Settings.ACTION_SECURITY_SETTINGS,
+      Settings.ACTION_DISPLAY_SETTINGS,
+      Settings.ACTION_SETTINGS
+    )
+    for (action in candidates) {
+      val intent = Intent(action).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      if (tryStartActivity(context, intent)) return true
+    }
+    return false
+  }
+
   fun openClockApp(context: Context): Boolean {
     val alarmIntent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

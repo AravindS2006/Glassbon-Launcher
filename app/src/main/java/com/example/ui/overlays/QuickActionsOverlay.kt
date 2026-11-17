@@ -28,14 +28,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -64,6 +65,7 @@ fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
   reducedMotion: Boolean = false,
   onOpenCalmScreen: () -> Unit,
+  onOpenLockScreenSettings: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
   onOpenWallpaper: () -> Unit,
@@ -135,7 +137,7 @@ fun QuickActionsOverlay(
         HorizontalDivider(color = MistColors.HairlineDivider)
 
         QuickActionRow(
-          icon = Icons.Outlined.Bedtime,
+          icon = Icons.Rounded.PowerSettingsNew,
           label = stringResource(R.string.action_calm_screen),
           testTag = "qa_calm_screen",
           onClick = onOpenCalmScreen
@@ -182,6 +184,12 @@ fun QuickActionsOverlay(
           modifier = Modifier.padding(vertical = 4.dp)
         )
 
+        QuickActionRow(
+          icon = Icons.Outlined.Lock,
+          label = stringResource(R.string.action_lock_settings),
+          testTag = "qa_lock_settings",
+          onClick = onOpenLockScreenSettings
+        )
         QuickActionRow(
           icon = Icons.Outlined.Home,
           label = stringResource(R.string.action_set_default_home),
