@@ -42,6 +42,7 @@ class ExampleRobolectricTest {
     assertFalse(requested.contains(android.Manifest.permission.READ_SMS))
     assertFalse(requested.contains(android.Manifest.permission.RECEIVE_SMS))
     assertFalse(requested.contains(android.Manifest.permission.READ_EXTERNAL_STORAGE))
+    assertTrue(requested.contains(android.Manifest.permission.WRITE_SETTINGS))
 
     val servicePermissions = pkgInfo.services?.mapNotNull { it.permission }.orEmpty()
     assertTrue(pkgInfo.services.isNullOrEmpty())

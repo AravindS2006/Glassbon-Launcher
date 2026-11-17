@@ -1,5 +1,8 @@
 package com.example
 
+import android.app.AppOpsManager
+import android.content.Intent
+import android.os.Process
 import android.provider.Settings
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -30,7 +33,16 @@ class LauncherUiRobolectricTest {
   val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
-  fun `home screen renders clock date alphabet rail and quick actions opens lock settings`() {
+  fun `home screen renders clock date alphabet rail and lock button prompts write settings without calm screen`() {
+    val activity = composeTestRule.activity
+    val appOps = activity.getSystemService(AppOpsManager::class.java)
+    shadowOf(appOps).setMode(
+      AppOpsManager.OPSTR_WRITE_SETTINGS,
+      Process.myUid(),
+      activity.packageName,
+      AppOpsManager.MODE_ERRORED
+    )
+
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_clock_area").assertIsDisplayed()
@@ -39,15 +51,40 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on bottom-right control opens Play-Protect-safe Quick Actions overlay
+    // Single tap on bottom-right Lock button opens Play-Protect-safe Modify System Settings dialog when disabled
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("lock_grant_write_settings_button").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    val writeSettingsIntent = shadowOf(activity).nextStartedActivity
+    assertEquals(Settings.ACTION_MANAGE_WRITE_SETTINGS, writeSettingsIntent?.action)
+    composeTestRule.onNodeWithTag("lock_permission_dialog").assertDoesNotExist()
+
+    // Grant Modify System Settings -> single tap sets 100ms screen-off timeout and restores original on SCREEN_OFF
+    shadowOf(appOps).setMode(
+      AppOpsManager.OPSTR_WRITE_SETTINGS,
+      Process.myUid(),
+      activity.packageName,
+      AppOpsManager.MODE_ALLOWED
+    )
+    Settings.System.putInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, 45_000)
+    composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
+    composeTestRule.waitForIdle()
+    assertEquals(100, Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT))
+    activity.sendBroadcast(Intent(Intent.ACTION_SCREEN_OFF).setPackage(activity.packageName))
+    composeTestRule.waitForIdle()
+    assertEquals(45_000, Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT))
+
+    // Long press opens Quick Actions with Lock Screen row and NO OLED Calm Screen row
+    composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput { longClick() }
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("qa_lock_screen").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("qa_lock_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_calm_screen").assertDoesNotExist()
     composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
-    val startedIntent = shadowOf(composeTestRule.activity).nextStartedActivity
+    val startedIntent = shadowOf(activity).nextStartedActivity
     assertEquals(Settings.ACTION_SECURITY_SETTINGS, startedIntent?.action)
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertDoesNotExist()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()

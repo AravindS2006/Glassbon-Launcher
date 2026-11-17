@@ -32,6 +32,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +62,7 @@ import com.example.R
 import com.example.core.graphics.AppIconCache
 import com.example.data.apps.AppInfo
 import com.example.data.preferences.HomeAlphabetVisibility
+import com.example.data.preferences.QuickActionMode
 import com.example.data.preferences.TypographyStyle
 import com.example.platform.ClockSnapshot
 import com.example.ui.LauncherUiState
@@ -403,9 +408,16 @@ fun HomeScreen(
       }
     }
 
-    // Bottom-right floating glass Quick Actions button (Tap = Configured Quick Action, Long-press = Quick Actions menu)
+    // Bottom-right floating glass Lock / Quick Action button (Tap = Configured Action, Long-press = Quick Actions menu)
+    val quickButtonIcon = when (prefs.quickActionMode) {
+      QuickActionMode.LOCK_SCREEN -> Icons.Rounded.PowerSettingsNew
+      QuickActionMode.QUICK_PANEL -> Icons.Rounded.Tune
+      QuickActionMode.DIRECT_SEARCH -> Icons.Rounded.Search
+      QuickActionMode.DIRECT_LIBRARY -> Icons.Rounded.Apps
+      QuickActionMode.LOCK_SETTINGS -> Icons.Outlined.Lock
+    }
     FloatingCircleButton(
-      icon = Icons.Rounded.Tune,
+      icon = quickButtonIcon,
       contentDescription = stringResource(R.string.cd_open_quick_actions),
       testTag = "home_quick_actions_button",
       onClick = onPowerButtonTap,

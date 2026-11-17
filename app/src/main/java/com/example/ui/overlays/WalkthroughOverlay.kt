@@ -37,7 +37,7 @@ import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -129,10 +129,10 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "Quick Actions & Customization",
-    description = "Tap the floating bottom-right control for Quick Actions—or customize its tap behavior in Preferences for Search, App Library, or Screen Lock Settings.",
+    title = "One-Tap Lock & Quick Actions",
+    description = "Tap the floating power button to turn off & lock your screen via a 100ms timeout (auto-restoring yours)—or press and hold anytime for Quick Actions.",
     tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside Quick Actions.",
-    icon = Icons.Outlined.Tune,
+    icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
 )
@@ -511,7 +511,7 @@ private fun SpatialAnchorBeacons(anchor: SpatialAnchor) {
 
       SpatialAnchor.BOTTOM_RIGHT -> {
         SpatialBeaconPill(
-          label = "Quick Actions · Hold for Menu",
+          label = "Lock Button · Hold for Actions",
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 22.dp, bottom = 78.dp)

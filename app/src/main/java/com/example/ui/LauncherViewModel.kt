@@ -24,6 +24,8 @@ import com.example.data.preferences.TypographyStyle
 import com.example.data.wallpaper.ProcessedWallpaper
 import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
+import com.example.platform.ScreenTimeoutLockHelper
+import com.example.platform.ScreenTimeoutLockResult
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -90,11 +92,13 @@ data class LauncherUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
+  val showLockPermissionDialog: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
+  val isScreenLockEnabled: Boolean = false,
   val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
   val wallpaper: ProcessedWallpaper = ProcessedWallpaper(null, null, isTopBright = true),
@@ -120,11 +124,13 @@ private data class TransientUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
+  val showLockPermissionDialog: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
+  val isScreenLockEnabled: Boolean = false,
   val statusMessage: String? = null
 )
 
@@ -141,7 +147,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   private val transientState = MutableStateFlow(
     TransientUiState(
-      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
+      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
+      isScreenLockEnabled = ScreenTimeoutLockHelper.canWriteSystemSettings(appContext)
     )
   )
   private val wallpaperState = MutableStateFlow(
@@ -234,11 +241,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       drawerJumpTarget = transient.drawerJumpTarget,
       isSearchActive = transient.isSearchActive,
       showQuickActions = transient.showQuickActions,
+      showLockPermissionDialog = transient.showLockPermissionDialog,
       showWalkthrough = transient.showWalkthrough,
       walkthroughStep = transient.walkthroughStep,
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
+      isScreenLockEnabled = transient.isScreenLockEnabled,
       activeMedia = media,
       preferences = derived.prefs,
       wallpaper = wallpaper,
@@ -339,6 +348,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onAppStart() {
     mediaRepository.startObserving()
+    ScreenTimeoutLockHelper.ensureReceiverRegistered(appContext)
+    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
     refreshSystemStatus()
   }
 
@@ -347,9 +358,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun refreshSystemStatus() {
+    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
     transientState.update {
       it.copy(
-        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
+        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
+        isScreenLockEnabled = ScreenTimeoutLockHelper.canWriteSystemSettings(appContext)
       )
     }
   }
@@ -423,10 +436,65 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onHomePowerButtonTap(context: Context = appContext) {
     when (uiState.value.preferences.quickActionMode) {
+      QuickActionMode.LOCK_SCREEN -> triggerScreenLock(context)
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
       QuickActionMode.LOCK_SETTINGS -> openLockScreenSettings(context)
+    }
+  }
+
+  fun triggerScreenLock(context: Context = appContext) {
+    when (ScreenTimeoutLockHelper.triggerShortTimeoutLock(context)) {
+      ScreenTimeoutLockResult.LOCKING_VIA_TIMEOUT -> {
+        transientState.update {
+          it.copy(
+            showQuickActions = false,
+            showLockPermissionDialog = false,
+            contextMenuApp = null,
+            isScreenLockEnabled = true
+          )
+        }
+      }
+      ScreenTimeoutLockResult.NEEDS_WRITE_SETTINGS_PERMISSION -> {
+        transientState.update {
+          it.copy(
+            isScreenLockEnabled = false,
+            showQuickActions = false,
+            showLockPermissionDialog = true,
+            contextMenuApp = null
+          )
+        }
+      }
+      ScreenTimeoutLockResult.FAILED -> {
+        transientState.update {
+          it.copy(
+            showQuickActions = false,
+            showLockPermissionDialog = false,
+            statusMessage = "Unable to apply screen-off timeout."
+          )
+        }
+      }
+    }
+  }
+
+  fun openLockPermissionPrompt() {
+    transientState.update {
+      it.copy(
+        showQuickActions = false,
+        showLockPermissionDialog = true
+      )
+    }
+  }
+
+  fun dismissLockPermissionDialog() {
+    transientState.update { it.copy(showLockPermissionDialog = false) }
+  }
+
+  fun openWriteSettingsPermission(context: Context = appContext) {
+    transientState.update { it.copy(showLockPermissionDialog = false) }
+    if (!ScreenTimeoutLockHelper.openWriteSettingsPermission(context)) {
+      transientState.update { it.copy(statusMessage = "System settings screen unavailable.") }
     }
   }
 
@@ -682,6 +750,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   override fun onCleared() {
     super.onCleared()
+    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
+    ScreenTimeoutLockHelper.unregisterReceiver(appContext)
     appRepository.stopObserving()
     mediaRepository.stopObserving()
     iconCache.clear()

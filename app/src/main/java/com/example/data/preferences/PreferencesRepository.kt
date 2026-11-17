@@ -80,7 +80,7 @@ class PreferencesRepository(private val context: Context) {
       reducedMotion = prefs[Keys.REDUCED_MOTION] ?: false,
       lowEffectsMode = prefs[Keys.LOW_EFFECTS_MODE] ?: false,
       hapticFeedback = prefs[Keys.HAPTIC_FEEDBACK] ?: true,
-      quickActionMode = parseEnum(prefs[Keys.QUICK_ACTION_MODE], QuickActionMode.QUICK_PANEL),
+      quickActionMode = parseEnum(prefs[Keys.QUICK_ACTION_MODE], QuickActionMode.LOCK_SCREEN),
       onboardingDismissed = prefs[Keys.ONBOARDING_DISMISSED] ?: false,
       walkthroughCompleted = prefs[Keys.WALKTHROUGH_COMPLETED] ?: false,
       favoritesSeeded = prefs[Keys.FAVORITES_SEEDED] ?: false

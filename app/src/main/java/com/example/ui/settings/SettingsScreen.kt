@@ -82,6 +82,7 @@ fun SettingsScreen(
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
+  onOpenWriteSettingsLockSetup: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
@@ -246,7 +247,7 @@ fun SettingsScreen(
           )
           DividerLine()
           SegmentedPreferenceRow(
-            title = "Bottom-Right Button Tap",
+            title = "Bottom-Right Lock Button Tap",
             options = QuickActionMode.entries,
             selected = prefs.quickActionMode,
             label = { it.displayName },
@@ -292,6 +293,17 @@ fun SettingsScreen(
 
         // SYSTEM INTEGRATION
         SectionBlock(title = "System Integration") {
+          NavigationPreferenceRow(
+            title = "One-Tap Screen Lock",
+            subtitle = if (uiState.isScreenLockEnabled) {
+              "Enabled — Uses 100ms screen timeout & auto-restores yours"
+            } else {
+              "Tap to allow Modify System Settings (Play-Protect safe)"
+            },
+            testTag = "settings_write_settings_lock_row",
+            onClick = onOpenWriteSettingsLockSetup
+          )
+          DividerLine()
           NavigationPreferenceRow(
             title = "Screen Lock & Security Settings",
             subtitle = "Open Android Lock Screen, PIN & display timeout settings",

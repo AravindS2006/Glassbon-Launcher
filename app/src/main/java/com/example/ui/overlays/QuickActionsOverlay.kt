@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -61,7 +62,9 @@ import com.example.ui.theme.MistColors
 @Composable
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
+  isScreenLockEnabled: Boolean = false,
   reducedMotion: Boolean = false,
+  onLockScreen: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
@@ -133,6 +136,13 @@ fun QuickActionsOverlay(
 
         HorizontalDivider(color = MistColors.HairlineDivider)
 
+        QuickActionRow(
+          icon = Icons.Rounded.PowerSettingsNew,
+          label = stringResource(R.string.action_lock_screen),
+          badge = if (isScreenLockEnabled) "Ready" else "Setup",
+          testTag = "qa_lock_screen",
+          onClick = onLockScreen
+        )
         QuickActionRow(
           icon = Icons.Outlined.Apps,
           label = stringResource(R.string.action_app_library),

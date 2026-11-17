@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Glassbon</string>
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
-    <string name="cd_open_quick_actions">Open quick actions or hold for menu</string>
+    <string name="cd_open_quick_actions">Lock screen or hold for quick actions</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_close_search">Close search</string>
@@ -23,6 +23,7 @@
     <string name="search_empty_subtitle">Try another name or clear your search.</string>
     <string name="favorites_section_title">Favorites</string>
     <string name="quick_actions_title">Quick Actions</string>
+    <string name="action_lock_screen">Lock Screen</string>
     <string name="action_lock_settings">Screen Lock Settings</string>
     <string name="action_app_library">App Library</string>
     <string name="action_search_apps">Search Apps</string>
@@ -47,4 +48,9 @@
     <string name="tour_back">Back</string>
     <string name="tour_next">Next</string>
     <string name="tour_finish">Start Using Glassbon</string>
+    <string name="lock_dialog_title">Enable One-Tap Screen Lock</string>
+    <string name="lock_dialog_body">To sleep and lock your screen without sensitive Accessibility permissions, Glassbon briefly sets the display timeout to 100ms and immediately restores your normal timeout once the screen turns off.</string>
+    <string name="lock_dialog_grant_write_settings">Allow Modify System Settings</string>
+    <string name="lock_dialog_open_security_settings">Screen Lock Settings</string>
+    <string name="lock_dialog_cancel">Cancel</string>
 </resources>

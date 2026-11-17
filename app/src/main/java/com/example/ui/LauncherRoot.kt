@@ -9,11 +9,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -32,8 +42,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.R
 import com.example.core.graphics.AppIconCache
 import com.example.platform.rememberSystemClockSnapshot
@@ -48,6 +61,7 @@ import com.example.ui.settings.FavoritesManagerScreen
 import com.example.ui.settings.HiddenAppsScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.settings.WallpaperStudioScreen
+import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import kotlinx.coroutines.delay
@@ -267,6 +281,10 @@ fun LauncherRoot(
         onOpenWallpaperStudio = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavoritesManager = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenHiddenApps = { viewModel.openOverlay(LauncherOverlay.HIDDEN_APPS) },
+        onOpenWriteSettingsLockSetup = {
+          viewModel.closeOverlay()
+          viewModel.openLockPermissionPrompt()
+        },
         onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartWalkthrough = { viewModel.startWalkthrough() },
@@ -326,7 +344,9 @@ fun LauncherRoot(
     ) {
       QuickActionsOverlay(
         isDefaultLauncher = uiState.isDefaultLauncher,
+        isScreenLockEnabled = uiState.isScreenLockEnabled,
         reducedMotion = prefs.effectiveReducedMotion,
+        onLockScreen = { viewModel.triggerScreenLock(context) },
         onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
@@ -340,6 +360,18 @@ fun LauncherRoot(
           onRequestDefaultHome()
         },
         onDismiss = { viewModel.toggleQuickActions(false) }
+      )
+    }
+
+    // 6b. Play-Protect-Safe Modify System Settings Prompt for 100ms Timeout Lock
+    if (uiState.showLockPermissionDialog) {
+      WriteSettingsLockDialog(
+        onGrantWriteSettings = { viewModel.openWriteSettingsPermission(context) },
+        onOpenSecuritySettings = {
+          viewModel.dismissLockPermissionDialog()
+          viewModel.openLockScreenSettings(context)
+        },
+        onDismiss = { viewModel.dismissLockPermissionDialog() }
       )
     }
 
@@ -413,3 +445,96 @@ private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
     1.0f to Color(0x780B0B0D)
   )
 )
+
+@Composable
+private fun WriteSettingsLockDialog(
+  onGrantWriteSettings: () -> Unit,
+  onOpenSecuritySettings: () -> Unit,
+  onDismiss: () -> Unit
+) {
+  Dialog(
+    onDismissRequest = onDismiss,
+    properties = DialogProperties(usePlatformDefaultWidth = false)
+  ) {
+    GlassSurface(
+      shape = RoundedCornerShape(24.dp),
+      backgroundColor = Color(0xEC16171B),
+      modifier = Modifier
+        .padding(horizontal = 24.dp)
+        .widthIn(min = 280.dp, max = 420.dp)
+        .testTag("lock_permission_dialog")
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 22.dp, vertical = 20.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.lock_dialog_title),
+          fontFamily = EditorialDisplayFontFamily,
+          fontSize = 24.sp,
+          color = MistColors.PureWhite
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+          text = stringResource(R.string.lock_dialog_body),
+          fontFamily = FunctionalSansFontFamily,
+          fontSize = 13.sp,
+          lineHeight = 19.sp,
+          color = MistColors.OffWhite.copy(alpha = 0.88f)
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        Button(
+          onClick = onGrantWriteSettings,
+          shape = RoundedCornerShape(14.dp),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = MistColors.PureWhite,
+            contentColor = MistColors.NearBlack
+          ),
+          modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .testTag("lock_grant_write_settings_button")
+        ) {
+          Text(
+            text = stringResource(R.string.lock_dialog_grant_write_settings),
+            fontFamily = FunctionalSansFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.5.sp
+          )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+          onClick = onOpenSecuritySettings,
+          shape = RoundedCornerShape(14.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .testTag("lock_open_security_settings_button")
+        ) {
+          Text(
+            text = stringResource(R.string.lock_dialog_open_security_settings),
+            fontFamily = FunctionalSansFontFamily,
+            fontSize = 13.sp,
+            color = MistColors.OffWhite
+          )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        TextButton(
+          onClick = onDismiss,
+          modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .heightIn(min = 48.dp)
+            .testTag("lock_dialog_cancel_button")
+        ) {
+          Text(
+            text = stringResource(R.string.lock_dialog_cancel),
+            fontFamily = FunctionalSansFontFamily,
+            fontSize = 12.5.sp,
+            color = MistColors.MistGrey
+          )
+        }
+      }
+    }
+  }
+}
