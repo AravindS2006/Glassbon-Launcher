@@ -1,0 +1,45 @@
+name: Bug Report
+description: Report a crash, visual glitch, or battery/performance regression in Glassbon
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for helping keep Glassbon smooth and reliable. Please fill out the details below.
+  - type: input
+    id: version
+    attributes:
+      label: Glassbon Version / Commit
+      placeholder: e.g. v1.0.0 or main@abc1234
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device & Android Version
+      placeholder: e.g. Pixel 8, Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug or frame drop.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open Home screen
+        2. Drag along left edge...
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Diagnostics
+      options:
+        - label: Checked on Accessibility / Media Listener permissions if applicable
+        - label: Reproducible with Reduced Motion disabled and enabled

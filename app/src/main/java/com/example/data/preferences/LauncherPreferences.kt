@@ -48,13 +48,15 @@ data class LauncherPreferences(
   val showDate: Boolean = true,
   val showHomeLabels: Boolean = false,
   val showAlphabetIndex: Boolean = true,
+  val showLeftHiddenAlphabet: Boolean = true,
   val homeAlphabetVisibility: HomeAlphabetVisibility = HomeAlphabetVisibility.VISIBLE,
-  val swipeUpOpensDrawer: Boolean = true,
+  val swipeUpOpensDrawer: Boolean = false,
   val searchAutoFocusKeyboard: Boolean = true,
   val reducedMotion: Boolean = false,
   val lowEffectsMode: Boolean = false,
   val hapticFeedback: Boolean = true,
   val quickActionMode: QuickActionMode = QuickActionMode.LOCK_SCREEN,
   val onboardingDismissed: Boolean = false,
+  val walkthroughCompleted: Boolean = false,
   val favoritesSeeded: Boolean = false
 )

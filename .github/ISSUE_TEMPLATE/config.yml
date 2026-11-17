@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security & Privacy Vulnerabilities
+    url: https://github.com/AravindS2006/Glassbon-Launcher/security/advisories/new
+    about: Please report security or permission-scope issues privately instead of via public issues.

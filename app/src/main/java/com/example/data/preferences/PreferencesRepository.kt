@@ -34,6 +34,7 @@ class PreferencesRepository(private val context: Context) {
     val SHOW_DATE = booleanPreferencesKey("show_date")
     val SHOW_HOME_LABELS = booleanPreferencesKey("show_home_labels")
     val SHOW_ALPHABET_INDEX = booleanPreferencesKey("show_alphabet_index")
+    val SHOW_LEFT_HIDDEN_ALPHABET = booleanPreferencesKey("show_left_hidden_alphabet")
     val HOME_ALPHABET_VISIBILITY = stringPreferencesKey("home_alphabet_visibility")
     val SWIPE_UP_OPENS_DRAWER = booleanPreferencesKey("swipe_up_opens_drawer")
     val SEARCH_AUTO_FOCUS_KEYBOARD = booleanPreferencesKey("search_auto_focus_keyboard")
@@ -42,6 +43,7 @@ class PreferencesRepository(private val context: Context) {
     val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
     val QUICK_ACTION_MODE = stringPreferencesKey("quick_action_mode")
     val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
+    val WALKTHROUGH_COMPLETED = booleanPreferencesKey("walkthrough_completed")
     val FAVORITES_SEEDED = booleanPreferencesKey("favorites_seeded")
   }
 
@@ -66,17 +68,19 @@ class PreferencesRepository(private val context: Context) {
       showDate = prefs[Keys.SHOW_DATE] ?: true,
       showHomeLabels = prefs[Keys.SHOW_HOME_LABELS] ?: false,
       showAlphabetIndex = prefs[Keys.SHOW_ALPHABET_INDEX] ?: true,
+      showLeftHiddenAlphabet = prefs[Keys.SHOW_LEFT_HIDDEN_ALPHABET] ?: true,
       homeAlphabetVisibility = parseEnum(
         prefs[Keys.HOME_ALPHABET_VISIBILITY],
         HomeAlphabetVisibility.VISIBLE
-      ),
-      swipeUpOpensDrawer = prefs[Keys.SWIPE_UP_OPENS_DRAWER] ?: true,
+      ).let { if (it == HomeAlphabetVisibility.OFF) HomeAlphabetVisibility.VISIBLE else it },
+      swipeUpOpensDrawer = false,
       searchAutoFocusKeyboard = prefs[Keys.SEARCH_AUTO_FOCUS_KEYBOARD] ?: true,
       reducedMotion = prefs[Keys.REDUCED_MOTION] ?: false,
       lowEffectsMode = prefs[Keys.LOW_EFFECTS_MODE] ?: false,
       hapticFeedback = prefs[Keys.HAPTIC_FEEDBACK] ?: true,
       quickActionMode = parseEnum(prefs[Keys.QUICK_ACTION_MODE], QuickActionMode.LOCK_SCREEN),
       onboardingDismissed = prefs[Keys.ONBOARDING_DISMISSED] ?: false,
+      walkthroughCompleted = prefs[Keys.WALKTHROUGH_COMPLETED] ?: false,
       favoritesSeeded = prefs[Keys.FAVORITES_SEEDED] ?: false
     )
   }
@@ -150,6 +154,10 @@ class PreferencesRepository(private val context: Context) {
     context.mistDataStore.edit { it[Keys.SHOW_ALPHABET_INDEX] = visible }
   }
 
+  suspend fun setShowLeftHiddenAlphabet(enabled: Boolean) {
+    context.mistDataStore.edit { it[Keys.SHOW_LEFT_HIDDEN_ALPHABET] = enabled }
+  }
+
   suspend fun setHomeAlphabetVisibility(visibility: HomeAlphabetVisibility) {
     context.mistDataStore.edit { it[Keys.HOME_ALPHABET_VISIBILITY] = visibility.name }
   }
@@ -180,6 +188,10 @@ class PreferencesRepository(private val context: Context) {
 
   suspend fun setOnboardingDismissed(dismissed: Boolean) {
     context.mistDataStore.edit { it[Keys.ONBOARDING_DISMISSED] = dismissed }
+  }
+
+  suspend fun setWalkthroughCompleted(completed: Boolean) {
+    context.mistDataStore.edit { it[Keys.WALKTHROUGH_COMPLETED] = completed }
   }
 
   private inline fun <reified T : Enum<T>> parseEnum(raw: String?, fallback: T): T {

@@ -40,7 +40,8 @@ fun MistAppIcon(
   tileSize: Dp,
   modifier: Modifier = Modifier,
   isPressed: Boolean = false,
-  reducedMotion: Boolean = false
+  reducedMotion: Boolean = false,
+  highContrastBackdrop: Boolean = false
 ) {
   val cached = iconCache.getCached(app.componentKey, iconStyle)
   val iconBitmap by produceState<ImageBitmap?>(
@@ -68,8 +69,8 @@ fun MistAppIcon(
       .then(
         if (isGlassMono) {
           Modifier
-            .background(TILE_FILL_BRUSH)
-            .border(width = 0.8.dp, brush = RIM_HIGHLIGHT_BRUSH, shape = shape)
+            .background(if (highContrastBackdrop) TILE_FILL_CONTRAST_BRUSH else TILE_FILL_BRUSH)
+            .border(width = 0.85.dp, brush = RIM_HIGHLIGHT_BRUSH, shape = shape)
         } else {
           Modifier
         }
@@ -109,6 +110,10 @@ fun MistAppIcon(
 
 private val TILE_FILL_BRUSH = Brush.verticalGradient(
   colors = listOf(MistColors.IconTileFillTop, MistColors.IconTileFillBottom)
+)
+
+private val TILE_FILL_CONTRAST_BRUSH = Brush.verticalGradient(
+  colors = listOf(Color(0xD8202126), Color(0xCC111215))
 )
 
 private val RIM_HIGHLIGHT_BRUSH = Brush.linearGradient(

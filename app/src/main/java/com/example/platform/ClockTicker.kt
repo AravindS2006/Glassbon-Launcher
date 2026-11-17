@@ -32,11 +32,12 @@ fun formatCurrentClockSnapshot(context: Context, nowMillis: Long = System.curren
   val is24Hour = DateFormat.is24HourFormat(context)
   val timePattern = if (is24Hour) "HH:mm" else "h:mm"
   val timeFormatter = SimpleDateFormat(timePattern, locale)
-  val dateSkeleton = DateFormat.getBestDateTimePattern(locale, "EEEMMMd")
-  val dateFormatter = SimpleDateFormat(dateSkeleton, locale)
+  val weekdayFormatter = SimpleDateFormat("EEE", locale)
+  val monthDaySkeleton = DateFormat.getBestDateTimePattern(locale, "MMMd")
+  val monthDayFormatter = SimpleDateFormat(monthDaySkeleton, locale)
   return ClockSnapshot(
     formattedTime = timeFormatter.format(now),
-    formattedDate = dateFormatter.format(now)
+    formattedDate = "${weekdayFormatter.format(now)} · ${monthDayFormatter.format(now)}"
   )
 }
 

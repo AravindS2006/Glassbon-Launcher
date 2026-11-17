@@ -1,0 +1,22 @@
+name: Feature Request
+description: Propose a minimalist UX refinement or customization option for Glassbon
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Glassbon prioritizes calm minimalism and zero idle battery drain.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: What would you like to add or improve?
+    validations:
+      required: true
+  - type: textarea
+    id: battery_impact
+    attributes:
+      label: Battery & Minimalism Fit
+      description: How does this avoid background polling, wake locks, or visual clutter?
+    validations:
+      required: false

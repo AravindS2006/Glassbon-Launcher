@@ -62,6 +62,8 @@ data class LauncherUiState(
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
   val showLockPermissionPrompt: Boolean = false,
+  val showWalkthrough: Boolean = false,
+  val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
@@ -91,6 +93,8 @@ private data class TransientUiState(
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
   val showLockPermissionPrompt: Boolean = false,
+  val showWalkthrough: Boolean = false,
+  val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
@@ -175,6 +179,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       isSearchActive = transient.isSearchActive,
       showQuickActions = transient.showQuickActions,
       showLockPermissionPrompt = transient.showLockPermissionPrompt,
+      showWalkthrough = transient.showWalkthrough,
+      walkthroughStep = transient.walkthroughStep,
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
@@ -290,6 +296,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         searchQuery = "",
         showQuickActions = false,
         showLockPermissionPrompt = false,
+        showWalkthrough = false,
         activeOverlay = LauncherOverlay.NONE,
         contextMenuApp = null
       )
@@ -421,6 +428,33 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update { it.copy(contextMenuApp = null) }
   }
 
+  fun startWalkthrough(initialStep: Int = 0) {
+    transientState.update {
+      it.copy(
+        isDrawerOpen = false,
+        drawerJumpTarget = null,
+        isSearchActive = false,
+        showQuickActions = false,
+        showLockPermissionPrompt = false,
+        activeOverlay = LauncherOverlay.NONE,
+        contextMenuApp = null,
+        showWalkthrough = true,
+        walkthroughStep = initialStep.coerceIn(0, 5)
+      )
+    }
+  }
+
+  fun setWalkthroughStep(step: Int) {
+    transientState.update { it.copy(walkthroughStep = step.coerceIn(0, 5)) }
+  }
+
+  fun finishWalkthrough() {
+    transientState.update { it.copy(showWalkthrough = false, walkthroughStep = 0) }
+    viewModelScope.launch {
+      preferencesRepository.setWalkthroughCompleted(true)
+    }
+  }
+
   fun launchApp(app: AppInfo) {
     val launched = appRepository.launchApp(app)
     if (!launched) {
@@ -548,6 +582,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun setShowAlphabetIndex(visible: Boolean) {
     viewModelScope.launch { preferencesRepository.setShowAlphabetIndex(visible) }
+  }
+
+  fun setShowLeftHiddenAlphabet(enabled: Boolean) {
+    viewModelScope.launch { preferencesRepository.setShowLeftHiddenAlphabet(enabled) }
   }
 
   fun setHomeAlphabetVisibility(visibility: HomeAlphabetVisibility) {

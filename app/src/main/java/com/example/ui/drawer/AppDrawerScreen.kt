@@ -85,6 +85,7 @@ import com.example.data.apps.AppInfo
 import com.example.data.preferences.TypographyStyle
 import com.example.ui.LauncherUiState
 import com.example.ui.components.AlphabetRail
+import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.FAVORITES_INDEX_KEY
 import com.example.ui.components.FloatingCircleButton
 import com.example.ui.components.GlassSurface
@@ -100,7 +101,8 @@ import kotlinx.coroutines.launch
 fun AppDrawerScreen(
   uiState: LauncherUiState,
   iconCache: AppIconCache,
-  hideAlphabetRail: Boolean = false,
+  hideRightAlphabetRail: Boolean = false,
+  hideLeftAlphabetRail: Boolean = false,
   onJumpTargetHandled: () -> Unit = {},
   onLaunchApp: (AppInfo) -> Unit,
   onLongPressApp: (AppInfo) -> Unit,
@@ -116,15 +118,25 @@ fun AppDrawerScreen(
   val keyboardController = LocalSoftwareKeyboardController.current
   val density = LocalDensity.current
 
-  // Niagara-style lightweight horizontal glide when scrubbing sections (single GPU transform on list)
-  var isRailDragging by remember { mutableStateOf(false) }
+  // Niagara-style lightweight horizontal glide when scrubbing sections from either edge (single GPU transform)
+  var draggingSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
   val listSlideOffsetX = remember { Animatable(0f) }
   val listDragShiftX = remember { Animatable(0f) }
   val scrubNudgePx = with(density) { 14.dp.toPx() }
   val dragPullPx = with(density) { 10.dp.toPx() }
 
-  LaunchedEffect(isRailDragging || hideAlphabetRail, prefs.reducedMotion) {
-    val targetShift = if ((isRailDragging || hideAlphabetRail) && !prefs.reducedMotion) -dragPullPx else 0f
+  val effectiveSide = when {
+    hideRightAlphabetRail -> AlphabetRailSide.RIGHT
+    hideLeftAlphabetRail -> AlphabetRailSide.LEFT
+    else -> draggingSide
+  }
+
+  LaunchedEffect(effectiveSide, prefs.reducedMotion) {
+    val targetShift = when {
+      prefs.reducedMotion || effectiveSide == null -> 0f
+      effectiveSide == AlphabetRailSide.RIGHT -> -dragPullPx
+      else -> dragPullPx
+    }
     if (prefs.reducedMotion) {
       listDragShiftX.snapTo(0f)
     } else {
@@ -300,7 +312,7 @@ fun AppDrawerScreen(
               }
               .testTag("drawer_app_list"),
             contentPadding = PaddingValues(
-              start = 24.dp,
+              start = if (prefs.showLeftHiddenAlphabet) 36.dp else 24.dp,
               end = if (prefs.showAlphabetIndex) 56.dp else 24.dp,
               top = 8.dp,
               bottom = 96.dp
@@ -352,8 +364,42 @@ fun AppDrawerScreen(
             }
           }
 
+          // Left-edge hidden mirrored Alphabet Rail inside the drawer
+          if (prefs.showLeftHiddenAlphabet && uiState.sections.isNotEmpty() && !hideLeftAlphabetRail) {
+            Box(
+              modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxHeight()
+                .padding(bottom = 68.dp),
+              contentAlignment = Alignment.CenterStart
+            ) {
+              AlphabetRail(
+                availableSections = availableSections,
+                activeKey = activeIndexKey,
+                hasFavorites = uiState.favoriteApps.isNotEmpty(),
+                hapticEnabled = prefs.hapticFeedback,
+                side = AlphabetRailSide.LEFT,
+                invisibleMode = true,
+                reducedMotion = prefs.reducedMotion,
+                useSansBubble = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
+                onDraggingChanged = { dragging ->
+                  draggingSide = if (dragging) AlphabetRailSide.LEFT else null
+                },
+                onSelectKey = { targetKey ->
+                  val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
+                  if (targetIndex != null) {
+                    coroutineScope.launch {
+                      listState.scrollToItem(targetIndex)
+                      triggerSectionSlide()
+                    }
+                  }
+                }
+              )
+            }
+          }
+
           // Right-edge curved vertical alphabet index
-          if (prefs.showAlphabetIndex && uiState.sections.isNotEmpty() && !hideAlphabetRail) {
+          if (prefs.showAlphabetIndex && uiState.sections.isNotEmpty() && !hideRightAlphabetRail) {
             Box(
               modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -366,9 +412,12 @@ fun AppDrawerScreen(
                 activeKey = activeIndexKey,
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
+                side = AlphabetRailSide.RIGHT,
                 reducedMotion = prefs.reducedMotion,
                 useSansBubble = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
-                onDraggingChanged = { isRailDragging = it },
+                onDraggingChanged = { dragging ->
+                  draggingSide = if (dragging) AlphabetRailSide.RIGHT else null
+                },
                 onSelectKey = { targetKey ->
                   val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
                   if (targetIndex != null) {

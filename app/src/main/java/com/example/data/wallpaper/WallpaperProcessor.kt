@@ -24,7 +24,9 @@ import kotlin.math.min
 data class ProcessedWallpaper(
   val homeBitmap: ImageBitmap?,
   val drawerBlurredBitmap: ImageBitmap?,
-  val isTopBright: Boolean
+  val isTopBright: Boolean,
+  val isMiddleBright: Boolean = false,
+  val isEdgesBright: Boolean = false
 )
 
 class WallpaperProcessor(private val context: Context) {
@@ -81,7 +83,7 @@ class WallpaperProcessor(private val context: Context) {
       sourceBitmap.recycle()
     }
 
-    val topBright = computeTopRegionBright(processedHome)
+    val regions = computeRegionLuminance(processedHome)
 
     val drawerBitmap = if (lowEffectsMode || blurIntensity <= 0.05f) {
       processedHome
@@ -93,7 +95,9 @@ class WallpaperProcessor(private val context: Context) {
     val result = ProcessedWallpaper(
       homeBitmap = processedHome.asImageBitmap(),
       drawerBlurredBitmap = drawerBitmap.asImageBitmap(),
-      isTopBright = topBright
+      isTopBright = regions.isTopBright,
+      isMiddleBright = regions.isMiddleBright,
+      isEdgesBright = regions.isEdgesBright
     )
     synchronized(cacheLock) {
       cachedConfigKey = configKey
@@ -173,23 +177,56 @@ class WallpaperProcessor(private val context: Context) {
     return out
   }
 
-  private fun computeTopRegionBright(bitmap: Bitmap): Boolean {
-    val sampleW = min(bitmap.width, max(1, (bitmap.width * 0.6f).toInt()))
-    val sampleH = min(bitmap.height, max(1, (bitmap.height * 0.24f).toInt()))
-    var sumLum = 0.0
-    var count = 0
-    val stepX = max(1, sampleW / 12)
-    val stepY = max(1, sampleH / 12)
-    for (y in 0 until sampleH step stepY) {
-      for (x in 0 until sampleW step stepX) {
+  private data class RegionBrightness(
+    val isTopBright: Boolean,
+    val isMiddleBright: Boolean,
+    val isEdgesBright: Boolean
+  )
+
+  private fun computeRegionLuminance(bitmap: Bitmap): RegionBrightness {
+    val w = bitmap.width.coerceAtLeast(1)
+    val h = bitmap.height.coerceAtLeast(1)
+    val stepX = max(1, w / 12)
+    val stepY = max(1, h / 12)
+
+    var topSum = 0.0
+    var topCount = 0
+    var midSum = 0.0
+    var midCount = 0
+    var edgeSum = 0.0
+    var edgeCount = 0
+
+    for (y in 0 until h step stepY) {
+      val yFrac = y.toFloat() / h.toFloat()
+      for (x in 0 until w step stepX) {
+        val xFrac = x.toFloat() / w.toFloat()
         val px = bitmap.getPixel(x, y)
         val lum = (0.299 * Color.red(px) + 0.587 * Color.green(px) + 0.114 * Color.blue(px)) / 255.0
-        sumLum += lum
-        count++
+
+        if (yFrac <= 0.26f && xFrac <= 0.70f) {
+          topSum += lum
+          topCount++
+        }
+        if (yFrac in 0.25f..0.82f && xFrac <= 0.45f) {
+          midSum += lum
+          midCount++
+        }
+        if (yFrac in 0.20f..0.85f && (xFrac <= 0.14f || xFrac >= 0.86f)) {
+          edgeSum += lum
+          edgeCount++
+        }
       }
     }
-    val avg = if (count > 0) sumLum / count else 0.5
-    return avg > 0.58
+
+    val topAvg = if (topCount > 0) topSum / topCount else 0.5
+    val midAvg = if (midCount > 0) midSum / midCount else 0.4
+    val edgeAvg = if (edgeCount > 0) edgeSum / edgeCount else 0.4
+
+    return RegionBrightness(
+      isTopBright = topAvg > 0.58,
+      isMiddleBright = midAvg > 0.56,
+      isEdgesBright = edgeAvg > 0.54
+    )
   }
 
   private fun createBlurredVariant(source: Bitmap, radius: Int): Bitmap {

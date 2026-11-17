@@ -1,6 +1,9 @@
 package com.example.ui.overlays
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,9 +23,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Lock
@@ -37,11 +43,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -57,18 +65,32 @@ import com.example.ui.theme.MistColors
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
   isMediaListenerEnabled: Boolean,
+  reducedMotion: Boolean = false,
   onLockScreen: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
   onOpenWallpaper: () -> Unit,
   onOpenFavorites: () -> Unit,
   onOpenPreferences: () -> Unit,
+  onStartWalkthrough: () -> Unit,
   onOpenMediaListenerSettings: () -> Unit,
   onOpenDeviceSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onDismiss: () -> Unit
 ) {
   BackHandler(onBack = onDismiss)
+
+  val reveal = remember { Animatable(if (reducedMotion) 1f else 0f) }
+  LaunchedEffect(reducedMotion) {
+    if (reducedMotion) {
+      reveal.snapTo(1f)
+    } else {
+      reveal.animateTo(
+        targetValue = 1f,
+        animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMedium)
+      )
+    }
+  }
 
   Box(
     modifier = Modifier
@@ -87,6 +109,13 @@ fun QuickActionsOverlay(
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .widthIn(min = 260.dp, max = 320.dp)
+        .graphicsLayer {
+          val p = reveal.value
+          alpha = p.coerceIn(0f, 1f)
+          val s = 0.94f + 0.06f * p
+          scaleX = s
+          scaleY = s
+        }
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
           indication = null,
@@ -94,7 +123,11 @@ fun QuickActionsOverlay(
         ),
       shape = RoundedCornerShape(22.dp)
     ) {
-      Column(modifier = Modifier.padding(vertical = 12.dp)) {
+      Column(
+        modifier = Modifier
+          .verticalScroll(rememberScrollState())
+          .padding(vertical = 12.dp)
+      ) {
         Text(
           text = stringResource(R.string.quick_actions_title),
           fontFamily = FunctionalSansFontFamily,
@@ -140,6 +173,12 @@ fun QuickActionsOverlay(
           label = stringResource(R.string.action_launcher_settings),
           testTag = "qa_preferences",
           onClick = onOpenPreferences
+        )
+        QuickActionRow(
+          icon = Icons.Outlined.Explore,
+          label = stringResource(R.string.action_interactive_tour),
+          testTag = "qa_walkthrough",
+          onClick = onStartWalkthrough
         )
 
         HorizontalDivider(

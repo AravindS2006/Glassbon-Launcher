@@ -1,52 +1,137 @@
-# Glassbon — Frosted Liquid-Glass Android Launcher
+<div align="center">
 
-Glassbon is a minimalist Android launcher built with Kotlin and Jetpack Compose, featuring a frosted liquid-glass squircle icon system, curved Gaussian-arc alphabet scrubbing from both Home and Drawer, one-tap Accessibility screen lock, and live media controls with liquid-glass artwork transitions.
+<img src="docs/media/glassbon-hero-banner.jpg" alt="Glassbon Frosted Liquid-Glass Android Launcher Hero" width="100%" />
 
-Repository: `https://github.com/AravindS2006/Glassbon-Launcher`
+# Glassbon
 
-## Features
+**Minimalist Frosted Liquid-Glass Android Launcher**  
+*Curved dual-edge Gaussian alphabet waves, adaptive multi-zone wallpaper contrast, compact monochrome squircles, and zero idle battery overhead.*
 
-- **Aesthetic Frosted Liquid-Glass Home Screen**:
-  - Edge-to-edge grayscale misty forest wallpaper (or user-selected photo via Android Photo Picker) with adaptive luminance contrast.
-  - `Instrument Serif` + `Plus Jakarta Sans` typography: tapping the Clock opens your device Clock/Alarms app, and tapping the Date opens your Calendar app.
-  - **Live Media Controls**: Automatically displays the currently playing or paused track beneath Clock/Date (via `NotificationListenerService` + `MediaSessionManager`) with rounded-square album art, liquid-glass directional wipe animation on track change, and Previous / Play-Pause / Next buttons.
-  - **Zero-Dot Frosted Glass Icons**: Adaptive monochrome + dual-tone icon rendering and corner-sampled background suppression ensure every installed app receives a clean glass squircle without missing icons or status dots.
-- **Curved Alphabet Access Bar (Home & Drawer)**:
-  - Niagara-style curved Gaussian arc scrub bar with a floating frosted letter bubble (`★` Favorites + `A–Z` + `#`).
-  - Accessible directly from the Home screen right edge (configurable in **Glassbon Preferences** as **Visible**, **Invisible Edge**, or **Off**) to jump smoothly into the App Library at any letter, alongside sleek sliding row animations.
-- **One-Tap Screen Lock & Quick Actions**:
-  - Bottom-right frosted glass Power button locks the phone screen on a single tap via Android's `AccessibilityService` (`GLOBAL_ACTION_LOCK_SCREEN`).
-  - Long-pressing the Power button opens the frosted **Quick Actions** sheet (Lock Screen, App Library, Search, Wallpaper, Home Shortcuts, Preferences, Media Controls access, Default Home, Device Settings).
-- **Privacy & Performance**:
-  - Zero network permissions, zero analytics, and zero broad storage permissions (`PickVisualMedia` Photo Picker only).
-  - Pre-blurred static drawer wallpaper cache and off-thread 96px icon LRU caching for smooth 60 FPS scrolling.
+[![License: MIT](https://img.shields.io/badge/License-MIT-F7F7F8.svg?style=flat-square&labelColor=171719)](LICENSE)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-9A9EA6.svg?style=flat-square&labelColor=171719)](https://developer.android.com/jetpack/compose)
+[![Android CI](https://img.shields.io/badge/CI-GitHub%20Actions-EAECEF.svg?style=flat-square&labelColor=171719)](.github/workflows/android-release.yml)
+[![Privacy](https://img.shields.io/badge/Network%20Access-Zero%20Internet-C9CDD4.svg?style=flat-square&labelColor=171719)](SECURITY.md)
+
+[Showcase Video](#-showcase-reel) · [Mockups](#-interface-mockups) · [Architecture](#-architecture--zero-battery-guarantee) · [Guided Tour](#-interactive-in-app-walkthrough) · [Build & Release](#-building--testing-locally) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+---
+
+## Showcase Reel
+
+<div align="center">
+
+<img src="docs/media/glassbon-preview.gif" alt="Glassbon Launcher Animated Showcase" width="88%" />
+
+**[Watch Full 720p HD Showcase Video (MP4)](docs/media/glassbon-showcase.mp4)**
+
+</div>
+
+---
+
+## Interface Mockups
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/media/glassbon-home-mockup.jpg" alt="Glassbon Home Screen Hardware Mockup" width="100%" />
+      <br />
+      <sub><strong>Intentional Home Workspace</strong> — Unified Clock & Calendar pill, compact left-gutter squircles, adaptive ink, and bottom-right glass Power control.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/media/glassbon-wave-drawer-mockup.jpg" alt="Glassbon Dual-Edge Curved Wave & Pop-Up App Preview Mockup" width="100%" />
+      <br />
+      <sub><strong>Dual-Edge Wave & Pop-Up Preview</strong> — Hidden left-edge curved Gaussian wave scrubbing and frosted Pop-Up App Preview card.</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Core Experience
+
+- **Aesthetic Frosted Liquid-Glass Home Screen**
+  - Edge-to-edge grayscale misty alpine forest wallpaper (or any personal photo via Android's zero-permission **Photo Picker**) with off-thread `RGB_565` bitmap caching.
+  - **Adaptive Multi-Zone Luminance Contrast**: Samples top, middle, and side-edge wallpaper luminance once off-thread (`12×12` grid) to adjust status bar icons, clock/date ink, right-edge contrast scrims, and favorite icon backing automatically.
+  - **Unified Clock & Frosted Calendar Pill**: Styled in **Plus Jakarta Sans** or **Instrument Serif**; tap time to open Alarms/Clock or tap the frosted date pill to launch Calendar.
+- **Dual-Edge Curved Alphabet Wave**
+  - Scrub vertically along the visible **Right A–Z Rail** *or* touch/drag the **Hidden Left Edge** (`28.dp` outer gutter protects favorites from accidental taps).
+  - At rest, the hidden left wave composes **zero** child nodes (`0%` idle GPU/CPU cost). Touching wakes a curved Gaussian arc wave and floating circular frosted bubble (`★` Favorites → `A–Z` → `#`).
+  - Only alphabet edges open the App Library—direct vertical swipes on Home remain calm and deliberate.
+- **Compact Frosted Squircles & Pop-Up App Preview**
+  - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights and corner-sampled background suppression.
+  - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
+- **Dynamic Live Media Capsule**
+  - Automatically expands beneath Clock/Date while music or podcasts play (and holds briefly for 12s when paused), then collapses cleanly to reclaim vertical Home space when idle.
+- **One-Tap Accessibility Screen Lock & Quick Actions**
+  - Tap the bottom-right glass Power button to lock the screen instantly via `AccessibilityService` (`GLOBAL_ACTION_LOCK_SCREEN`).
+  - Long-press it for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences**, and the **Guided Feature Tour**.
+
+---
+
+## Architecture & Zero-Battery Guarantee
+
+<div align="center">
+  <img src="docs/media/glassbon-architecture-layers.jpg" alt="Glassbon 4-Layer Rendering Architecture Visualization" width="90%" />
+</div>
+
+| Subsystem | Zero-Overhead Technique | Battery & Performance Impact |
+| :--- | :--- | :--- |
+| **Wallpaper & Blur** | Static `RGB_565` downscaled bitmaps + one-time `RenderEffect` / downsampled drawer pre-blur | Zero per-frame shader overhead |
+| **Luminance Contrast** | Single `12×12` pixel grid sample on `Dispatchers.IO` upon wallpaper change | Cached boolean flags; zero runtime polling |
+| **Hidden Left Wave** | Transparent `30.dp` touch strip at rest; 28-letter Gaussian arc composes only during drag | `0%` idle CPU/GPU composition cost |
+| **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; respects **Reduced Motion** |
+| **Clock & Media** | Event-driven `ACTION_TIME_TICK` & `MediaController.Callback` bound to `onStart`/`onStop` | Zero background loops, `WakeLock`s, or timers |
+
+---
+
+## Interactive In-App Walkthrough
+
+Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOverlay`) featuring swipeable frosted glass cards and live spatial edge/corner anchor beacons:
+
+1. **Pure Calm, Zero Battery Drain** — Static cached frosting & zero polling overview.
+2. **Unified Clock & Calendar Pill** — Tap targets & adaptive wallpaper contrast.
+3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
+4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
+5. **Smart Live Media Capsule** — Space-reclaiming dynamic playback card.
+6. **One-Tap Lock & Quick Actions** — Power button tap vs. hold gestures.
+
+Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
+
+---
 
 ## Building & Testing Locally
 
 ```bash
+# Build Debug APK
 gradle :app:assembleDebug
-gradle :app:testDebugUnitTest
+
+# Run all Unit & Robolectric UI Tests (no emulator needed)
+gradle :app:testDebugUnitTest --no-daemon
 ```
+
+---
 
 ## GitHub Push & Automated APK Releases
 
-This project includes `.github/workflows/android-release.yml`:
-- Every push or pull request to `main` runs `:app:testDebugUnitTest` and uploads `Glassbon-debug-apk` as a workflow artifact.
-- Pushing a version tag (`v*`) or triggering `workflow_dispatch` automatically builds the APK and attaches it to a new GitHub Release.
-
-To push to your repository and trigger your first APK release:
+This repository includes `.github/workflows/android-release.yml`:
+- **Push / Pull Request to `main`**: Runs `:app:testDebugUnitTest` and uploads `Glassbon-debug-apk` as a workflow artifact.
+- **Version Tag (`v*`) or Manual Dispatch**: Automatically builds the APK and publishes a GitHub Release with the APK attached.
 
 ```bash
-git init
-git add .
-git commit -m "Initial Glassbon Launcher release"
-git branch -M main
-git remote add origin https://github.com/AravindS2006/Glassbon-Launcher.git
-git push -u origin main
-
-# Trigger automated GitHub Release with attached APK:
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-*(Optional)* For Play-signed release APKs on tagged releases, add GitHub repository secrets `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` (matching alias `upload`). Without those secrets, the release workflow automatically falls back to attaching the debug-signed APK so releases never fail.
+*(Optional)* Add repository secrets `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` (alias `upload`) for release-key signing; otherwise the workflow safely falls back to debug signing so automated builds never fail.
+
+---
+
+## Community, Rules & Licensing
+
+- **Contributing Guidelines**: Read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Pull Request Checklist](.github/PULL_REQUEST_TEMPLATE.md) before submitting code.
+- **Code of Conduct**: Governed by the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
+- **Security & Privacy Policy**: Offline zero-network architecture and disclosure instructions in [SECURITY.md](SECURITY.md).
+- **Release History**: Tracked in [CHANGELOG.md](CHANGELOG.md).
+- **License**: Distributed under the **[MIT License](LICENSE)**.

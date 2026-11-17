@@ -68,6 +68,7 @@ fun SettingsScreen(
   onSetShowDate: (Boolean) -> Unit,
   onSetShowHomeLabels: (Boolean) -> Unit,
   onSetShowAlphabetIndex: (Boolean) -> Unit,
+  onSetShowLeftHiddenAlphabet: (Boolean) -> Unit,
   onSetHomeAlphabetVisibility: (HomeAlphabetVisibility) -> Unit,
   onSetHomeShortcutLimit: (Int) -> Unit,
   onSetQuickActionMode: (QuickActionMode) -> Unit,
@@ -82,6 +83,7 @@ fun SettingsScreen(
   onOpenAccessibilitySettings: () -> Unit,
   onOpenNotificationListenerSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
+  onStartWalkthrough: () -> Unit,
   onClose: () -> Unit
 ) {
   BackHandler(onBack = onClose)
@@ -188,10 +190,17 @@ fun SettingsScreen(
           DividerLine()
           SegmentedPreferenceRow(
             title = "Home Alphabet Bar",
-            options = HomeAlphabetVisibility.entries,
+            options = HomeAlphabetVisibility.entries.filter { it != HomeAlphabetVisibility.OFF },
             selected = prefs.homeAlphabetVisibility,
             label = { it.displayName },
             onSelect = onSetHomeAlphabetVisibility
+          )
+          DividerLine()
+          TogglePreferenceRow(
+            title = "Left Hidden Alphabet Edge",
+            subtitle = "Reveal curved wave drawer on left-edge drag",
+            checked = prefs.showLeftHiddenAlphabet,
+            onCheckedChange = onSetShowLeftHiddenAlphabet
           )
           DividerLine()
           TogglePreferenceRow(
@@ -236,12 +245,6 @@ fun SettingsScreen(
 
         // BEHAVIOR
         SectionBlock(title = "Behavior") {
-          TogglePreferenceRow(
-            title = "Swipe Up for App Library",
-            checked = prefs.swipeUpOpensDrawer,
-            onCheckedChange = onSetSwipeUpOpensDrawer
-          )
-          DividerLine()
           TogglePreferenceRow(
             title = "Auto-Focus Search Keyboard",
             checked = prefs.searchAutoFocusKeyboard,
@@ -298,6 +301,16 @@ fun SettingsScreen(
             subtitle = if (uiState.isDefaultLauncher) "Glassbon is currently default" else "Tap to set Glassbon as default Home",
             testTag = "settings_default_home_row",
             onClick = onRequestDefaultHome
+          )
+        }
+
+        // HELP & WALKTHROUGH
+        SectionBlock(title = "Guide") {
+          NavigationPreferenceRow(
+            title = "Interactive Feature Tour",
+            subtitle = "Walk through gestures, curved alphabet wave & previews",
+            testTag = "settings_walkthrough_row",
+            onClick = onStartWalkthrough
           )
         }
 

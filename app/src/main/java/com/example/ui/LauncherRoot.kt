@@ -35,12 +35,14 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
 import com.example.platform.rememberSystemClockSnapshot
+import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.GlassSurface
 import com.example.ui.drawer.AppDrawerScreen
 import com.example.ui.home.HomeScreen
 import com.example.ui.overlays.AppContextMenuDialog
 import com.example.ui.overlays.LockPermissionDialog
 import com.example.ui.overlays.QuickActionsOverlay
+import com.example.ui.overlays.WalkthroughOverlay
 import com.example.ui.settings.FavoritesManagerScreen
 import com.example.ui.settings.HiddenAppsScreen
 import com.example.ui.settings.SettingsScreen
@@ -59,11 +61,12 @@ fun LauncherRoot(
 ) {
   val prefs = uiState.preferences
   val clockSnapshot = rememberSystemClockSnapshot()
-  var isHomeRailScrubbing by remember { mutableStateOf(false) }
+  var activeHomeScrubSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
 
   val isOverlayBlockingLightTop = uiState.isDrawerOpen ||
     uiState.showQuickActions ||
     uiState.showLockPermissionPrompt ||
+    uiState.showWalkthrough ||
     uiState.contextMenuApp != null ||
     uiState.activeOverlay == LauncherOverlay.SETTINGS ||
     uiState.activeOverlay == LauncherOverlay.FAVORITES_MANAGER ||
@@ -101,7 +104,7 @@ fun LauncherRoot(
     derivedStateOf { drawerProgressState.value > 0.005f }
   }
   val showHomeLayer by remember {
-    derivedStateOf { drawerProgressState.value < 0.995f || isHomeRailScrubbing }
+    derivedStateOf { drawerProgressState.value < 0.995f || activeHomeScrubSide != null }
   }
 
   Box(
@@ -181,7 +184,8 @@ fun LauncherRoot(
       AppDrawerScreen(
         uiState = uiState,
         iconCache = iconCache,
-        hideAlphabetRail = isHomeRailScrubbing,
+        hideRightAlphabetRail = activeHomeScrubSide == AlphabetRailSide.RIGHT,
+        hideLeftAlphabetRail = activeHomeScrubSide == AlphabetRailSide.LEFT,
         onJumpTargetHandled = { viewModel.updateDrawerJumpTarget(null) },
         onLaunchApp = { viewModel.launchApp(it) },
         onLongPressApp = { viewModel.openContextMenu(it) },
@@ -206,9 +210,8 @@ fun LauncherRoot(
         clockSnapshot = clockSnapshot,
         iconCache = iconCache,
         drawerProgressProvider = { drawerProgressState.value },
-        onOpenDrawer = { viewModel.openDrawer(withSearch = false) },
-        onScrubToDrawerSection = { key ->
-          isHomeRailScrubbing = true
+        onScrubToDrawerSection = { key, side ->
+          activeHomeScrubSide = side
           if (uiState.isDrawerOpen) {
             viewModel.updateDrawerJumpTarget(key)
           } else {
@@ -216,7 +219,7 @@ fun LauncherRoot(
           }
         },
         onScrubDragEnd = {
-          isHomeRailScrubbing = false
+          activeHomeScrubSide = null
         },
         onLaunchApp = { viewModel.launchApp(it) },
         onLongPressApp = { viewModel.openContextMenu(it) },
@@ -229,6 +232,7 @@ fun LauncherRoot(
         onSkipMediaPrevious = { viewModel.skipMediaPrevious() },
         onOpenActiveMediaPlayer = { viewModel.openActiveMediaPlayer() },
         onRequestDefaultHome = onRequestDefaultHome,
+        onStartTour = { viewModel.startWalkthrough() },
         onDismissOnboarding = { viewModel.dismissOnboarding() }
       )
     }
@@ -249,6 +253,7 @@ fun LauncherRoot(
         onSetShowDate = viewModel::setShowDate,
         onSetShowHomeLabels = viewModel::setShowHomeLabels,
         onSetShowAlphabetIndex = viewModel::setShowAlphabetIndex,
+        onSetShowLeftHiddenAlphabet = viewModel::setShowLeftHiddenAlphabet,
         onSetHomeAlphabetVisibility = viewModel::setHomeAlphabetVisibility,
         onSetHomeShortcutLimit = viewModel::setHomeShortcutLimit,
         onSetQuickActionMode = viewModel::setQuickActionMode,
@@ -263,6 +268,7 @@ fun LauncherRoot(
         onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
         onOpenNotificationListenerSettings = { viewModel.openNotificationListenerSettings() },
         onRequestDefaultHome = onRequestDefaultHome,
+        onStartWalkthrough = { viewModel.startWalkthrough() },
         onClose = { viewModel.closeOverlay() }
       )
     }
@@ -320,12 +326,14 @@ fun LauncherRoot(
       QuickActionsOverlay(
         isDefaultLauncher = uiState.isDefaultLauncher,
         isMediaListenerEnabled = uiState.isMediaListenerEnabled,
+        reducedMotion = prefs.reducedMotion,
         onLockScreen = { viewModel.lockScreenOrPrompt() },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
         onOpenWallpaper = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
         onOpenFavorites = { viewModel.openOverlay(LauncherOverlay.FAVORITES_MANAGER) },
         onOpenPreferences = { viewModel.openOverlay(LauncherOverlay.SETTINGS) },
+        onStartWalkthrough = { viewModel.startWalkthrough() },
         onOpenMediaListenerSettings = { viewModel.openNotificationListenerSettings() },
         onOpenDeviceSettings = { viewModel.openDeviceSettings() },
         onRequestDefaultHome = {
@@ -349,7 +357,21 @@ fun LauncherRoot(
       )
     }
 
-    // 8. Contextual Long-Press App Menu
+    // 7b. Interactive Frosted Feature Walkthrough Tour
+    AnimatedVisibility(
+      visible = uiState.showWalkthrough,
+      enter = fadeIn(tween(quickDuration)),
+      exit = fadeOut(tween(quickDuration))
+    ) {
+      WalkthroughOverlay(
+        currentStep = uiState.walkthroughStep,
+        reducedMotion = prefs.reducedMotion,
+        onStepChange = { viewModel.setWalkthroughStep(it) },
+        onFinish = { viewModel.finishWalkthrough() }
+      )
+    }
+
+    // 8. Contextual Frosted Pop-Up App Preview
     val contextApp = uiState.contextMenuApp
     if (contextApp != null) {
       val favIndex = uiState.favoriteApps.indexOfFirst { it.componentKey == contextApp.componentKey }
@@ -361,6 +383,7 @@ fun LauncherRoot(
         isHidden = contextApp.componentKey in prefs.hiddenKeys,
         iconCache = iconCache,
         iconStyle = prefs.iconStyle,
+        reducedMotion = prefs.reducedMotion,
         onToggleFavorite = { viewModel.toggleFavorite(contextApp) },
         onMoveFavoriteEarlier = { viewModel.moveFavorite(contextApp.componentKey, -1) },
         onMoveFavoriteLater = { viewModel.moveFavorite(contextApp.componentKey, 1) },

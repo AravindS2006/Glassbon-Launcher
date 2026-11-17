@@ -15,8 +15,11 @@
     <string name="accessibility_lock_description">Allows Glassbon\'s power button to lock your screen with one tap without retrieving window content.</string>
     <string name="media_listener_label">Glassbon Media Controls</string>
     <string name="onboarding_title">Set Glassbon as your Home</string>
+    <string name="onboarding_tour_only_title">Explore Glassbon</string>
     <string name="onboarding_body">Make Glassbon your default launcher to return here whenever you press Home.</string>
+    <string name="onboarding_tour_only_body">Take a quick interactive tour of dual-edge wave scrubbing, adaptive contrast, and one-tap gestures.</string>
     <string name="onboarding_cta">Set Default</string>
+    <string name="onboarding_start_tour">Take Tour</string>
     <string name="onboarding_dismiss">Later</string>
     <string name="lock_permission_title">Enable One-Tap Screen Lock</string>
     <string name="lock_permission_body">Enable Glassbon Screen Lock in Accessibility settings so tapping the power button locks your phone instantly. Long-press anytime for Quick Actions.</string>
@@ -32,6 +35,7 @@
     <string name="action_wallpaper_studio">Wallpaper</string>
     <string name="action_manage_favorites">Home Shortcuts</string>
     <string name="action_launcher_settings">Glassbon Preferences</string>
+    <string name="action_interactive_tour">Guided Feature Tour</string>
     <string name="action_system_settings">Device Settings</string>
     <string name="action_set_default_home">Default Home App</string>
     <string name="action_add_favorite">Add to Favorites</string>
@@ -45,4 +49,8 @@
     <string name="settings_title">Preferences</string>
     <string name="wallpaper_title">Wallpaper</string>
     <string name="favorites_title">Home &amp; Favorites</string>
+    <string name="tour_skip">Skip</string>
+    <string name="tour_back">Back</string>
+    <string name="tour_next">Next</string>
+    <string name="tour_finish">Start Using Glassbon</string>
 </resources>
