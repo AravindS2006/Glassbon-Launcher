@@ -3,7 +3,8 @@ package com.example.ui.drawer
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -83,6 +84,7 @@ import com.example.R
 import com.example.core.graphics.AppIconCache
 import com.example.data.apps.AppInfo
 import com.example.data.preferences.TypographyStyle
+import com.example.ui.DrawerRowItem
 import com.example.ui.LauncherUiState
 import com.example.ui.components.AlphabetRail
 import com.example.ui.components.AlphabetRailSide
@@ -95,12 +97,14 @@ import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import com.example.ui.theme.appLabelTextStyle
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
 @Composable
 fun AppDrawerScreen(
   uiState: LauncherUiState,
   iconCache: AppIconCache,
+  drawerJumpEvents: SharedFlow<String>,
   hideRightAlphabetRail: Boolean = false,
   hideLeftAlphabetRail: Boolean = false,
   onJumpTargetHandled: () -> Unit = {},
@@ -118,12 +122,10 @@ fun AppDrawerScreen(
   val keyboardController = LocalSoftwareKeyboardController.current
   val density = LocalDensity.current
 
-  // Niagara-style lightweight horizontal glide when scrubbing sections from either edge (single GPU transform)
+  // Niagara-style smooth horizontal glide away from the active thumb edge (zero per-letter snap resets)
   var draggingSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
-  val listSlideOffsetX = remember { Animatable(0f) }
   val listDragShiftX = remember { Animatable(0f) }
-  val scrubNudgePx = with(density) { 14.dp.toPx() }
-  val dragPullPx = with(density) { 10.dp.toPx() }
+  val dragPullPx = with(density) { 12.dp.toPx() }
 
   val effectiveSide = when {
     hideRightAlphabetRail -> AlphabetRailSide.RIGHT
@@ -142,18 +144,10 @@ fun AppDrawerScreen(
     } else {
       listDragShiftX.animateTo(
         targetValue = targetShift,
-        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
-      )
-    }
-  }
-
-  fun triggerSectionSlide() {
-    if (prefs.reducedMotion) return
-    coroutineScope.launch {
-      listSlideOffsetX.snapTo(scrubNudgePx)
-      listSlideOffsetX.animateTo(
-        targetValue = 0f,
-        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+        animationSpec = spring(
+          dampingRatio = 0.88f,
+          stiffness = Spring.StiffnessMediumLow
+        )
       )
     }
   }
@@ -168,32 +162,30 @@ fun AppDrawerScreen(
     }
   }
 
-  val sectionIndexMap = remember(uiState.sections, uiState.favoriteApps) {
-    val map = LinkedHashMap<String, Int>()
-    var cursor = 0
-    if (uiState.favoriteApps.isNotEmpty()) {
-      map[FAVORITES_INDEX_KEY] = 0
-      cursor += 1 + uiState.favoriteApps.size
-    }
-    for (section in uiState.sections) {
-      map[section.header] = cursor
-      cursor += 1 + section.apps.size
-    }
-    map
-  }
+  val sectionIndexMap = uiState.sectionIndexMap
 
-  // Scroll immediately when jumped to a section from Home screen's Alphabet Rail
+  // Initial jump when opening the drawer from Home screen's Alphabet Rail
   LaunchedEffect(uiState.drawerJumpTarget, sectionIndexMap) {
     val target = uiState.drawerJumpTarget ?: return@LaunchedEffect
     val index = findNearestSectionIndex(target, sectionIndexMap)
     if (index != null) {
       listState.scrollToItem(index)
-      triggerSectionSlide()
     }
     onJumpTargetHandled()
   }
 
-  val activeIndexKey by remember(sectionIndexMap) {
+  // Imperative continuous scrub jumps while dragging from Home's Alphabet Rail (0 recompositions!)
+  LaunchedEffect(drawerJumpEvents, sectionIndexMap) {
+    drawerJumpEvents.collect { target ->
+      val index = findNearestSectionIndex(target, sectionIndexMap)
+      if (index != null) {
+        listState.scrollToItem(index)
+      }
+    }
+  }
+
+  // Only read inside activeKeyProvider lambda passed to AlphabetRail -> AppDrawerScreen NEVER recomposes while scrolling!
+  val activeIndexKeyState = remember(sectionIndexMap) {
     derivedStateOf {
       val layoutInfo = listState.layoutInfo
       val visibleItems = layoutInfo.visibleItemsInfo
@@ -229,7 +221,7 @@ fun AppDrawerScreen(
     Column(modifier = Modifier.fillMaxSize()) {
       AnimatedContent(
         targetState = uiState.isSearchActive,
-        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(120)) },
+        transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(110)) },
         label = "drawer_header_transition"
       ) { searching ->
         if (searching) {
@@ -302,13 +294,16 @@ fun AppDrawerScreen(
             onLongPressApp = onLongPressApp
           )
         } else {
-          // Hardware-accelerated LazyColumn (no per-row animateItem overhead) with Niagara-style list slide
+          val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
+          val isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC
+          val favoritesTitle = stringResource(R.string.favorites_section_title)
+
           LazyColumn(
             state = listState,
             modifier = Modifier
               .fillMaxSize()
               .graphicsLayer {
-                translationX = listSlideOffsetX.value + listDragShiftX.value
+                translationX = listDragShiftX.value
               }
               .testTag("drawer_app_list"),
             contentPadding = PaddingValues(
@@ -318,48 +313,37 @@ fun AppDrawerScreen(
               bottom = 96.dp
             )
           ) {
-            if (uiState.favoriteApps.isNotEmpty()) {
-              item(key = "header_favorites", contentType = "header") {
-                DrawerSectionHeader(
-                  title = stringResource(R.string.favorites_section_title),
-                  modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)
-                )
-              }
-              items(
-                items = uiState.favoriteApps,
-                key = { "fav_${it.componentKey}" },
-                contentType = { "app_row" }
-              ) { app ->
-                DrawerAppRow(
-                  app = app,
-                  uiState = uiState,
-                  iconCache = iconCache,
-                  onClick = { onLaunchApp(app) },
-                  onLongClick = { onLongPressApp(app) }
-                )
-              }
-            }
-
-            for (section in uiState.sections) {
-              item(key = "section_${section.header}", contentType = "header") {
-                DrawerSectionHeader(
-                  title = section.header,
-                  useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
-                  modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)
-                )
-              }
-              items(
-                items = section.apps,
-                key = { "${section.header}_${it.componentKey}" },
-                contentType = { "app_row" }
-              ) { app ->
-                DrawerAppRow(
-                  app = app,
-                  uiState = uiState,
-                  iconCache = iconCache,
-                  onClick = { onLaunchApp(app) },
-                  onLongClick = { onLongPressApp(app) }
-                )
+            items(
+              items = uiState.drawerRows,
+              key = { it.rowKey },
+              contentType = { it.contentType }
+            ) { rowItem ->
+              when (rowItem) {
+                is DrawerRowItem.Header -> {
+                  DrawerSectionHeader(
+                    title = if (rowItem.isFavoritesHeader) favoritesTitle else rowItem.title,
+                    useSans = useSans || rowItem.isFavoritesHeader,
+                    modifier = Modifier.padding(
+                      top = if (rowItem.isFavoritesHeader) 8.dp else 20.dp,
+                      bottom = 6.dp
+                    )
+                  )
+                }
+                is DrawerRowItem.App -> {
+                  val app = rowItem.app
+                  DrawerAppRow(
+                    app = app,
+                    iconCache = iconCache,
+                    iconStyle = prefs.iconStyle,
+                    tileSize = prefs.iconSize.drawerTileDp.dp,
+                    isItalic = isItalic,
+                    useSans = useSans,
+                    hapticFeedback = prefs.hapticFeedback,
+                    reducedMotion = prefs.reducedMotion,
+                    onClick = { onLaunchApp(app) },
+                    onLongClick = { onLongPressApp(app) }
+                  )
+                }
               }
             }
           }
@@ -375,23 +359,20 @@ fun AppDrawerScreen(
             ) {
               AlphabetRail(
                 availableSections = availableSections,
-                activeKey = activeIndexKey,
+                activeKeyProvider = { activeIndexKeyState.value },
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 side = AlphabetRailSide.LEFT,
                 invisibleMode = true,
                 reducedMotion = prefs.reducedMotion,
-                useSansBubble = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
+                useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.LEFT else null
                 },
                 onSelectKey = { targetKey ->
                   val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
                   if (targetIndex != null) {
-                    coroutineScope.launch {
-                      listState.scrollToItem(targetIndex)
-                      triggerSectionSlide()
-                    }
+                    coroutineScope.launch { listState.scrollToItem(targetIndex) }
                   }
                 }
               )
@@ -409,22 +390,19 @@ fun AppDrawerScreen(
             ) {
               AlphabetRail(
                 availableSections = availableSections,
-                activeKey = activeIndexKey,
+                activeKeyProvider = { activeIndexKeyState.value },
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 side = AlphabetRailSide.RIGHT,
                 reducedMotion = prefs.reducedMotion,
-                useSansBubble = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
+                useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.RIGHT else null
                 },
                 onSelectKey = { targetKey ->
                   val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
                   if (targetIndex != null) {
-                    coroutineScope.launch {
-                      listState.scrollToItem(targetIndex)
-                      triggerSectionSlide()
-                    }
+                    coroutineScope.launch { listState.scrollToItem(targetIndex) }
                   }
                 }
               )
@@ -487,32 +465,32 @@ private fun DrawerSectionHeader(
 @Composable
 private fun DrawerAppRow(
   app: AppInfo,
-  uiState: LauncherUiState,
   iconCache: AppIconCache,
+  iconStyle: com.example.data.preferences.IconStyle,
+  tileSize: androidx.compose.ui.unit.Dp,
+  isItalic: Boolean,
+  useSans: Boolean,
+  hapticFeedback: Boolean,
+  reducedMotion: Boolean,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val prefs = uiState.preferences
   val haptics = LocalHapticFeedback.current
   val interactionSource = remember(app.componentKey) { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-
-  val isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC
-  val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
 
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = modifier
       .fillMaxWidth()
       .heightIn(min = 48.dp)
-      .clip(RoundedCornerShape(12.dp))
       .combinedClickable(
         interactionSource = interactionSource,
         indication = ripple(bounded = true, color = MistColors.PureWhite),
         onClick = onClick,
         onLongClick = {
-          if (prefs.hapticFeedback) {
+          if (hapticFeedback) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
           }
           onLongClick()
@@ -524,10 +502,10 @@ private fun DrawerAppRow(
     MistAppIcon(
       app = app,
       iconCache = iconCache,
-      iconStyle = prefs.iconStyle,
-      tileSize = prefs.iconSize.drawerTileDp.dp,
+      iconStyle = iconStyle,
+      tileSize = tileSize,
       isPressed = isPressed,
-      reducedMotion = prefs.reducedMotion
+      reducedMotion = reducedMotion
     )
 
     Spacer(modifier = Modifier.width(16.dp))
@@ -642,6 +620,7 @@ private fun SearchResultsList(
   onLaunchApp: (AppInfo) -> Unit,
   onLongPressApp: (AppInfo) -> Unit
 ) {
+  val prefs = uiState.preferences
   if (results.isEmpty()) {
     Column(
       modifier = Modifier
@@ -660,7 +639,7 @@ private fun SearchResultsList(
       Spacer(modifier = Modifier.height(12.dp))
       Text(
         text = stringResource(R.string.search_empty_title),
-        fontFamily = if (uiState.preferences.typographyStyle == TypographyStyle.CLEAN_SANS) {
+        fontFamily = if (prefs.typographyStyle == TypographyStyle.CLEAN_SANS) {
           FunctionalSansFontFamily
         } else {
           EditorialSerifFontFamily
@@ -681,6 +660,9 @@ private fun SearchResultsList(
       )
     }
   } else {
+    val isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC
+    val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
+
     LazyColumn(
       modifier = Modifier
         .fillMaxSize()
@@ -694,8 +676,13 @@ private fun SearchResultsList(
       ) { app ->
         DrawerAppRow(
           app = app,
-          uiState = uiState,
           iconCache = iconCache,
+          iconStyle = prefs.iconStyle,
+          tileSize = prefs.iconSize.drawerTileDp.dp,
+          isItalic = isItalic,
+          useSans = useSans,
+          hapticFeedback = prefs.hapticFeedback,
+          reducedMotion = prefs.reducedMotion,
           onClick = { onLaunchApp(app) },
           onLongClick = { onLongPressApp(app) }
         )

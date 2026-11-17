@@ -12,19 +12,7 @@
 [![Android CI](https://img.shields.io/badge/CI-GitHub%20Actions-EAECEF.svg?style=flat-square&labelColor=171719)](.github/workflows/android-release.yml)
 [![Privacy](https://img.shields.io/badge/Network%20Access-Zero%20Internet-C9CDD4.svg?style=flat-square&labelColor=171719)](SECURITY.md)
 
-[Showcase Video](#-showcase-reel) · [Mockups](#-interface-mockups) · [Architecture](#-architecture--zero-battery-guarantee) · [Guided Tour](#-interactive-in-app-walkthrough) · [Build & Release](#-building--testing-locally) · [Contributing](CONTRIBUTING.md)
-
-</div>
-
----
-
-## Showcase Reel
-
-<div align="center">
-
-<img src="docs/media/glassbon-preview.gif" alt="Glassbon Launcher Animated Showcase" width="88%" />
-
-**[Watch Full 720p HD Showcase Video (MP4)](docs/media/glassbon-showcase.mp4)**
+[Mockups](#-interface-mockups) · [Architecture](#-architecture--zero-battery-guarantee) · [Guided Tour](#-interactive-in-app-walkthrough) · [Build & Release](#-building--testing-locally) · [Contributing](CONTRIBUTING.md)
 
 </div>
 

@@ -22,6 +22,7 @@ import com.example.data.apps.AppInfo
 import com.example.data.preferences.IconStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -42,9 +43,29 @@ class AppIconCache(private val context: Context) {
 
     return withContext(Dispatchers.Default) {
       val bitmap = renderIconBitmap(app, style) ?: return@withContext null
+      bitmap.prepareToDraw()
       val imageBitmap = bitmap.asImageBitmap()
       cache.put(cacheKey, imageBitmap)
       imageBitmap
+    }
+  }
+
+  suspend fun prewarm(apps: List<AppInfo>, style: IconStyle) {
+    if (apps.isEmpty()) return
+    withContext(Dispatchers.Default) {
+      val limit = apps.size.coerceAtMost(180)
+      for (i in 0 until limit) {
+        val app = apps[i]
+        val key = "${app.componentKey}_${style.name}"
+        if (cache.get(key) == null) {
+          val bitmap = renderIconBitmap(app, style)
+          if (bitmap != null) {
+            bitmap.prepareToDraw()
+            cache.put(key, bitmap.asImageBitmap())
+          }
+          if (i % 4 == 3) yield()
+        }
+      }
     }
   }
 

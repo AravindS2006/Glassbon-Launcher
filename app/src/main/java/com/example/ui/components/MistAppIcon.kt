@@ -1,12 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +14,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -54,39 +54,49 @@ fun MistAppIcon(
     }
   }
 
-  val shape = remember(tileSize) { RoundedCornerShape((tileSize.value * 0.30f).dp) }
   val isGlassMono = iconStyle == IconStyle.DOT_MONO
+  val originalShape = remember(tileSize, isGlassMono) {
+    if (isGlassMono) null else RoundedCornerShape((tileSize.value * 0.30f).dp)
+  }
+
+  // Single-pass squircle fill + top sheen + specular rim with zero offscreen clip() layers for DOT_MONO
+  val tileModifier = if (isGlassMono) {
+    val fillBrush = if (highContrastBackdrop) TILE_FILL_CONTRAST_BRUSH else TILE_FILL_BRUSH
+    Modifier.drawBehind {
+      val radius = size.width * 0.30f
+      val corner = CornerRadius(radius, radius)
+      drawRoundRect(
+        brush = fillBrush,
+        cornerRadius = corner
+      )
+      drawRoundRect(
+        brush = INNER_SHEEN_BRUSH,
+        size = Size(size.width, size.height * 0.42f),
+        cornerRadius = corner
+      )
+      drawRoundRect(
+        brush = RIM_HIGHLIGHT_BRUSH,
+        cornerRadius = corner,
+        style = Stroke(width = 0.85.dp.toPx())
+      )
+    }
+  } else {
+    Modifier.clip(originalShape!!)
+  }
 
   Box(
     modifier = modifier
       .size(tileSize)
-      .graphicsLayer {
-        val s = if (isPressed && !reducedMotion) 0.92f else 1f
-        scaleX = s
-        scaleY = s
-      }
-      .clip(shape)
       .then(
-        if (isGlassMono) {
-          Modifier
-            .background(if (highContrastBackdrop) TILE_FILL_CONTRAST_BRUSH else TILE_FILL_BRUSH)
-            .border(width = 0.85.dp, brush = RIM_HIGHLIGHT_BRUSH, shape = shape)
-        } else {
-          Modifier
+        if (reducedMotion) Modifier else Modifier.graphicsLayer {
+          val s = if (isPressed) 0.92f else 1f
+          scaleX = s
+          scaleY = s
         }
-      ),
+      )
+      .then(tileModifier),
     contentAlignment = Alignment.Center
   ) {
-    if (isGlassMono) {
-      Box(
-        modifier = Modifier
-          .align(Alignment.TopCenter)
-          .fillMaxWidth()
-          .height(tileSize * 0.40f)
-          .background(INNER_SHEEN_BRUSH)
-      )
-    }
-
     val bmp = iconBitmap
     if (bmp != null) {
       Image(

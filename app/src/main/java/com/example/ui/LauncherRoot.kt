@@ -146,7 +146,7 @@ fun LauncherRoot(
       )
     }
 
-    // 2. Pre-blurred frosted-glass wallpaper layer for the App Drawer
+    // 2. Pre-blurred frosted-glass wallpaper layer for the App Drawer (single blended scrim to cut overdraw)
     if (showDrawerLayer) {
       val drawerBmp = uiState.wallpaper.drawerBlurredBitmap ?: homeBmp
       Box(
@@ -165,25 +165,17 @@ fun LauncherRoot(
         Box(
           modifier = Modifier
             .fillMaxSize()
-            .background(
-              MistColors.FrostedGrey.copy(
-                alpha = (0.14f + prefs.drawerBlurIntensity * 0.14f).coerceIn(0.08f, 0.30f)
-              )
-            )
-        )
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .background(DRAWER_CHARCOAL_SCRIM)
+            .background(Color(0x76141519))
         )
       }
     }
 
-    // 3. App Drawer layer (0 recompositions during transition)
+    // 3. App Drawer layer (translationY + alpha only; avoids expensive whole-screen scale texture resizing)
     if (showDrawerLayer && uiState.activeOverlay == LauncherOverlay.NONE) {
       AppDrawerScreen(
         uiState = uiState,
         iconCache = iconCache,
+        drawerJumpEvents = viewModel.drawerJumpEvents,
         hideRightAlphabetRail = activeHomeScrubSide == AlphabetRailSide.RIGHT,
         hideLeftAlphabetRail = activeHomeScrubSide == AlphabetRailSide.LEFT,
         onJumpTargetHandled = { viewModel.updateDrawerJumpTarget(null) },
@@ -195,10 +187,7 @@ fun LauncherRoot(
         modifier = Modifier.graphicsLayer {
           val p = drawerProgressState.value
           alpha = p
-          translationY = (1f - p) * 56f
-          val scale = 0.97f + 0.03f * p
-          scaleX = scale
-          scaleY = scale
+          translationY = (1f - p) * 28f
         }
       )
     }
@@ -213,7 +202,7 @@ fun LauncherRoot(
         onScrubToDrawerSection = { key, side ->
           activeHomeScrubSide = side
           if (uiState.isDrawerOpen) {
-            viewModel.updateDrawerJumpTarget(key)
+            viewModel.emitDrawerJump(key)
           } else {
             viewModel.openDrawer(withSearch = false, jumpToSection = key)
           }
@@ -426,5 +415,3 @@ private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
     1.0f to Color(0x780B0B0D)
   )
 )
-
-private val DRAWER_CHARCOAL_SCRIM = Color(0x68121215)

@@ -268,7 +268,7 @@ fun HomeScreen(
       ) {
         AlphabetRail(
           availableSections = availableSections,
-          activeKey = uiState.drawerJumpTarget,
+          activeKeyProvider = { null },
           hasFavorites = uiState.favoriteApps.isNotEmpty(),
           hapticEnabled = prefs.hapticFeedback,
           side = AlphabetRailSide.LEFT,
@@ -292,7 +292,7 @@ fun HomeScreen(
     ) {
       AlphabetRail(
         availableSections = availableSections,
-        activeKey = uiState.drawerJumpTarget,
+        activeKeyProvider = { null },
         hasFavorites = uiState.favoriteApps.isNotEmpty(),
         hapticEnabled = prefs.hapticFeedback,
         side = AlphabetRailSide.RIGHT,

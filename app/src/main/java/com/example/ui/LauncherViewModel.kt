@@ -26,9 +26,13 @@ import com.example.platform.GlassbonLockAccessibilityService
 import com.example.platform.GlassbonMediaListenerService
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -47,12 +51,37 @@ enum class LauncherOverlay {
 }
 
 @Immutable
+sealed interface DrawerRowItem {
+  val rowKey: String
+  val contentType: String
+
+  @Immutable
+  data class Header(
+    override val rowKey: String,
+    val title: String,
+    val isFavoritesHeader: Boolean = false
+  ) : DrawerRowItem {
+    override val contentType: String = "header"
+  }
+
+  @Immutable
+  data class App(
+    override val rowKey: String,
+    val app: AppInfo
+  ) : DrawerRowItem {
+    override val contentType: String = "app_row"
+  }
+}
+
+@Immutable
 data class LauncherUiState(
   val isLoading: Boolean = true,
   val allApps: List<AppInfo> = emptyList(),
   val visibleApps: List<AppInfo> = emptyList(),
   val sections: List<AppSection> = emptyList(),
   val favoriteApps: List<AppInfo> = emptyList(),
+  val drawerRows: List<DrawerRowItem> = emptyList(),
+  val sectionIndexMap: Map<String, Int> = emptyMap(),
   val homeShortcutApps: List<AppInfo> = emptyList(),
   val hiddenApps: List<AppInfo> = emptyList(),
   val searchQuery: String = "",
@@ -81,6 +110,8 @@ private data class DerivedAppsBundle(
   val visibleApps: List<AppInfo>,
   val sections: List<AppSection>,
   val favoriteApps: List<AppInfo>,
+  val drawerRows: List<DrawerRowItem>,
+  val sectionIndexMap: Map<String, Int>,
   val homeShortcutApps: List<AppInfo>,
   val hiddenApps: List<AppInfo>,
   val prefs: LauncherPreferences
@@ -125,7 +156,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     ProcessedWallpaper(homeBitmap = null, drawerBlurredBitmap = null, isTopBright = true)
   )
 
-  // Heavy grouping & filtering runs on Dispatchers.Default ONLY when apps or preferences change
+  private val _drawerJumpEvents = MutableSharedFlow<String>(
+    extraBufferCapacity = 8,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+  val drawerJumpEvents: SharedFlow<String> = _drawerJumpEvents.asSharedFlow()
+
+  // Heavy grouping, row flattening & filtering run on Dispatchers.Default ONLY when apps or preferences change
   private val derivedAppsFlow = combine(
     appRepository.apps,
     appRepository.isLoading,
@@ -140,12 +177,31 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val hiddenApps = hiddenSet.mapNotNull { key -> appByKey[key] }
       .sortedBy { it.label.lowercase() }
 
+    val drawerRows = ArrayList<DrawerRowItem>(visibleApps.size + favoriteApps.size + sections.size + 2)
+    val sectionIndexMap = LinkedHashMap<String, Int>(sections.size + 1)
+    if (favoriteApps.isNotEmpty()) {
+      sectionIndexMap["★"] = 0
+      drawerRows.add(DrawerRowItem.Header("header_favorites", "", isFavoritesHeader = true))
+      for (fav in favoriteApps) {
+        drawerRows.add(DrawerRowItem.App("fav_${fav.componentKey}", fav))
+      }
+    }
+    for (section in sections) {
+      sectionIndexMap[section.header] = drawerRows.size
+      drawerRows.add(DrawerRowItem.Header("section_${section.header}", section.header))
+      for (app in section.apps) {
+        drawerRows.add(DrawerRowItem.App("${section.header}_${app.componentKey}", app))
+      }
+    }
+
     DerivedAppsBundle(
       loading = loading,
       allApps = allApps,
       visibleApps = visibleApps,
       sections = sections,
       favoriteApps = favoriteApps,
+      drawerRows = drawerRows,
+      sectionIndexMap = sectionIndexMap,
       homeShortcutApps = homeShortcutApps,
       hiddenApps = hiddenApps,
       prefs = prefs
@@ -170,6 +226,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       visibleApps = derived.visibleApps,
       sections = derived.sections,
       favoriteApps = derived.favoriteApps,
+      drawerRows = derived.drawerRows,
+      sectionIndexMap = derived.sectionIndexMap,
       homeShortcutApps = derived.homeShortcutApps,
       hiddenApps = derived.hiddenApps,
       searchQuery = transient.searchQuery,
@@ -230,6 +288,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             lowEffectsMode = key.lowEffects
           )
           wallpaperState.value = processed
+        }
+    }
+
+    // One-shot background prewarm of app icons so App Drawer opens and scrolls at 60-120 FPS
+    viewModelScope.launch {
+      combine(
+        appRepository.apps,
+        preferencesRepository.preferences.map { it.iconStyle }.distinctUntilChanged()
+      ) { apps, style -> apps to style }
+        .collect { (apps, style) ->
+          if (apps.isNotEmpty()) {
+            iconCache.prewarm(apps, style)
+          }
         }
     }
   }
@@ -321,6 +392,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   fun updateDrawerJumpTarget(sectionKey: String?) {
     if (transientState.value.drawerJumpTarget == sectionKey) return
     transientState.update { it.copy(drawerJumpTarget = sectionKey) }
+  }
+
+  fun emitDrawerJump(sectionKey: String) {
+    _drawerJumpEvents.tryEmit(sectionKey)
   }
 
   fun closeDrawer() {
