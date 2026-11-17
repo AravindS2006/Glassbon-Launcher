@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -30,8 +31,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Text
@@ -81,8 +84,7 @@ fun HomeScreen(
   uiState: LauncherUiState,
   clockSnapshot: ClockSnapshot,
   iconCache: AppIconCache,
-  contentAlpha: Float,
-  contentTranslationY: Float,
+  drawerProgressProvider: () -> Float,
   onOpenDrawer: () -> Unit,
   onScrubToDrawerSection: (String) -> Unit,
   onScrubDragEnd: () -> Unit,
@@ -131,17 +133,20 @@ fun HomeScreen(
       }
       .windowInsetsPadding(WindowInsets.statusBars)
       .windowInsetsPadding(WindowInsets.navigationBars)
-      .padding(horizontal = 24.dp, vertical = 20.dp)
+      .padding(horizontal = 24.dp, vertical = 18.dp)
   ) {
-    // Upper-left Clock, Date, Live Liquid-Glass Media Card & Favorite Rail
+    // Structural Home Layout: Atmospheric Header (Clock + Date + Media) + Vertically Balanced Favorite Rail
     Column(
       modifier = Modifier
-        .align(Alignment.TopStart)
-        .fillMaxWidth()
-        .padding(end = if (prefs.homeAlphabetVisibility != HomeAlphabetVisibility.OFF) 32.dp else 0.dp)
+        .fillMaxSize()
+        .padding(
+          end = if (prefs.homeAlphabetVisibility != HomeAlphabetVisibility.OFF) 34.dp else 0.dp,
+          bottom = 68.dp
+        )
         .graphicsLayer {
-          alpha = contentAlpha
-          translationY = contentTranslationY
+          val p = drawerProgressProvider()
+          alpha = (1f - p * 1.25f).coerceIn(0f, 1f)
+          translationY = -p * 40f
         }
     ) {
       Spacer(modifier = Modifier.height(10.dp))
@@ -173,60 +178,80 @@ fun HomeScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(if (uiState.activeMedia.hasSession) 20.dp else 32.dp))
+      Spacer(modifier = Modifier.height(if (uiState.activeMedia.hasSession) 18.dp else 26.dp))
 
-      // Vertical strip of favorite shortcuts along the left edge
-      Column(
-        modifier = Modifier.testTag("home_favorites_rail"),
-        verticalArrangement = Arrangement.spacedBy(13.dp),
-        horizontalAlignment = Alignment.Start
+      // Balanced thumb-friendly favorite shortcuts container (scroll-safe on compact viewports)
+      Box(
+        modifier = Modifier
+          .weight(1f)
+          .fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart
       ) {
-        uiState.homeShortcutApps.forEach { app ->
-          val interactionSource = remember(app.componentKey) { MutableInteractionSource() }
-          val isPressed by interactionSource.collectIsPressedAsState()
+        Column(
+          modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .testTag("home_favorites_rail"),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+          horizontalAlignment = Alignment.Start
+        ) {
+          uiState.homeShortcutApps.forEach { app ->
+            val interactionSource = remember(app.componentKey) { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
 
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-              .testTag("home_favorite_${app.packageName}")
-              .heightIn(min = 48.dp)
-              .clip(RoundedCornerShape(14.dp))
-              .combinedClickable(
-                interactionSource = interactionSource,
-                indication = ripple(bounded = true, color = MistColors.PureWhite),
-                onClick = { onLaunchApp(app) },
-                onLongClick = {
-                  if (prefs.hapticFeedback) {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            val rowModifier = if (prefs.showHomeLabels) {
+              Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0x26141518))
+                .border(0.65.dp, Color(0x28FFFFFF), RoundedCornerShape(16.dp))
+                .padding(start = 6.dp, end = 14.dp, top = 5.dp, bottom = 5.dp)
+            } else {
+              Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .padding(horizontal = 2.dp, vertical = 2.dp)
+            }
+
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier
+                .testTag("home_favorite_${app.packageName}")
+                .heightIn(min = 48.dp)
+                .then(rowModifier)
+                .combinedClickable(
+                  interactionSource = interactionSource,
+                  indication = ripple(bounded = true, color = MistColors.PureWhite),
+                  onClick = { onLaunchApp(app) },
+                  onLongClick = {
+                    if (prefs.hapticFeedback) {
+                      haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    onLongPressApp(app)
                   }
-                  onLongPressApp(app)
-                }
+                )
+                .semantics { contentDescription = app.label }
+            ) {
+              MistAppIcon(
+                app = app,
+                iconCache = iconCache,
+                iconStyle = prefs.iconStyle,
+                tileSize = prefs.iconSize.homeTileDp.dp,
+                isPressed = isPressed,
+                reducedMotion = prefs.reducedMotion
               )
-              .padding(horizontal = 2.dp, vertical = 3.dp)
-              .semantics { contentDescription = app.label }
-          ) {
-            MistAppIcon(
-              app = app,
-              iconCache = iconCache,
-              iconStyle = prefs.iconStyle,
-              tileSize = prefs.iconSize.homeTileDp.dp,
-              isPressed = isPressed,
-              reducedMotion = prefs.reducedMotion
-            )
 
-            if (prefs.showHomeLabels) {
-              Spacer(modifier = Modifier.width(12.dp))
-              Text(
-                text = app.label,
-                style = appLabelTextStyle(
-                  isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC,
-                  useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
-                ),
-                color = MistColors.OffWhite.copy(alpha = 0.94f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 180.dp)
-              )
+              if (prefs.showHomeLabels) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                  text = app.label,
+                  style = appLabelTextStyle(
+                    isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC,
+                    useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
+                  ),
+                  color = MistColors.OffWhite.copy(alpha = 0.94f),
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                  modifier = Modifier.widthIn(max = 190.dp)
+                )
+              }
             }
           }
         }
@@ -239,7 +264,7 @@ fun HomeScreen(
         modifier = Modifier
           .align(Alignment.CenterEnd)
           .fillMaxHeight()
-          .padding(top = 48.dp, bottom = 76.dp)
+          .padding(top = 52.dp, bottom = 78.dp)
           .testTag("home_alphabet_rail_container"),
         contentAlignment = Alignment.CenterEnd
       ) {
@@ -257,13 +282,16 @@ fun HomeScreen(
     }
 
     // Subtle Default-Home onboarding pill (shown only when Glassbon is not yet default & not dismissed)
-    if (!uiState.isDefaultLauncher && !prefs.onboardingDismissed && contentAlpha > 0.2f) {
+    if (!uiState.isDefaultLauncher && !prefs.onboardingDismissed) {
       GlassSurface(
         modifier = Modifier
           .align(Alignment.BottomStart)
-          .padding(end = 72.dp, bottom = 6.dp)
-          .widthIn(max = 320.dp)
-          .graphicsLayer { alpha = contentAlpha }
+          .padding(end = 74.dp, bottom = 6.dp)
+          .widthIn(max = 310.dp)
+          .graphicsLayer {
+            val p = drawerProgressProvider()
+            alpha = (1f - p * 1.4f).coerceIn(0f, 1f)
+          }
           .testTag("default_home_onboarding"),
         shape = RoundedCornerShape(18.dp)
       ) {
@@ -316,46 +344,50 @@ fun HomeScreen(
     }
 
     // Subtle bottom-center swipe/tap indicator to open the application library
-    if (contentAlpha > 0.2f) {
-      val drawerCd = stringResource(R.string.cd_open_drawer)
+    val drawerCd = stringResource(R.string.cd_open_drawer)
+    Box(
+      modifier = Modifier
+        .align(Alignment.BottomCenter)
+        .size(width = 88.dp, height = 48.dp)
+        .graphicsLayer {
+          val p = drawerProgressProvider()
+          alpha = (1f - p * 1.4f).coerceIn(0f, 1f)
+        }
+        .clip(CircleShape)
+        .clickable(
+          interactionSource = remember { MutableInteractionSource() },
+          indication = null,
+          role = Role.Button,
+          onClick = onOpenDrawer
+        )
+        .semantics { contentDescription = drawerCd }
+        .testTag("home_drawer_handle"),
+      contentAlignment = Alignment.BottomCenter
+    ) {
       Box(
         modifier = Modifier
-          .align(Alignment.BottomCenter)
-          .size(width = 88.dp, height = 48.dp)
-          .graphicsLayer { alpha = contentAlpha }
+          .padding(bottom = 8.dp)
+          .size(width = 36.dp, height = 3.dp)
           .clip(CircleShape)
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            role = Role.Button,
-            onClick = onOpenDrawer
-          )
-          .semantics { contentDescription = drawerCd }
-          .testTag("home_drawer_handle"),
-        contentAlignment = Alignment.BottomCenter
-      ) {
-        Box(
-          modifier = Modifier
-            .padding(bottom = 8.dp)
-            .size(width = 36.dp, height = 3.dp)
-            .clip(CircleShape)
-            .background(Color(0x55FFFFFF))
-        )
-      }
-
-      // Bottom-right floating glass power control (Tap = Lock Screen / Configured mode, Long-press = Quick Actions)
-      FloatingCircleButton(
-        icon = Icons.Rounded.PowerSettingsNew,
-        contentDescription = stringResource(R.string.cd_open_quick_actions),
-        testTag = "home_quick_actions_button",
-        onClick = onPowerButtonTap,
-        onLongClick = onPowerButtonLongPress,
-        hapticFeedback = prefs.hapticFeedback,
-        reducedMotion = prefs.reducedMotion,
-        modifier = Modifier
-          .align(Alignment.BottomEnd)
-          .graphicsLayer { alpha = contentAlpha }
+          .background(Color(0x55FFFFFF))
       )
     }
+
+    // Bottom-right floating glass power control (Tap = Lock Screen / Configured mode, Long-press = Quick Actions)
+    FloatingCircleButton(
+      icon = Icons.Rounded.PowerSettingsNew,
+      contentDescription = stringResource(R.string.cd_open_quick_actions),
+      testTag = "home_quick_actions_button",
+      onClick = onPowerButtonTap,
+      onLongClick = onPowerButtonLongPress,
+      hapticFeedback = prefs.hapticFeedback,
+      reducedMotion = prefs.reducedMotion,
+      modifier = Modifier
+        .align(Alignment.BottomEnd)
+        .graphicsLayer {
+          val p = drawerProgressProvider()
+          alpha = (1f - p * 1.4f).coerceIn(0f, 1f)
+        }
+    )
   }
 }

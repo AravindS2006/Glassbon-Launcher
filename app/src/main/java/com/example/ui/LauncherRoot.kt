@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,11 +83,12 @@ fun LauncherRoot(
 
   val transitionDurationMs = when {
     prefs.reducedMotion -> 0
-    uiState.isDrawerOpen -> 260
-    else -> 210
+    uiState.isDrawerOpen -> 220
+    else -> 180
   }
 
-  val drawerProgress by animateFloatAsState(
+  // Read drawerProgressState.value ONLY inside derivedStateOf and graphicsLayer lambdas (0 per-frame recompositions!)
+  val drawerProgressState = animateFloatAsState(
     targetValue = if (uiState.isDrawerOpen) 1f else 0f,
     animationSpec = tween(
       durationMillis = transitionDurationMs,
@@ -95,12 +97,19 @@ fun LauncherRoot(
     label = "drawer_progress"
   )
 
+  val showDrawerLayer by remember {
+    derivedStateOf { drawerProgressState.value > 0.005f }
+  }
+  val showHomeLayer by remember {
+    derivedStateOf { drawerProgressState.value < 0.995f || isHomeRailScrubbing }
+  }
+
   Box(
     modifier = Modifier
       .fillMaxSize()
       .background(MistColors.NearBlack)
   ) {
-    // 1. Base sharp wallpaper layer (visible on Home & Wallpaper Studio)
+    // 1. Base sharp wallpaper layer
     val homeBmp = uiState.wallpaper.homeBitmap
     if (homeBmp != null) {
       Image(
@@ -122,15 +131,7 @@ fun LauncherRoot(
     Box(
       modifier = Modifier
         .fillMaxSize()
-        .background(
-          Brush.verticalGradient(
-            colorStops = arrayOf(
-              0.0f to Color.Transparent,
-              0.55f to Color.Transparent,
-              1.0f to Color(0x780B0B0D)
-            )
-          )
-        )
+        .background(BOTTOM_ATMOSPHERIC_SCRIM)
     )
 
     // User-configurable wallpaper darkening veil
@@ -143,12 +144,12 @@ fun LauncherRoot(
     }
 
     // 2. Pre-blurred frosted-glass wallpaper layer for the App Drawer
-    if (drawerProgress > 0.005f) {
+    if (showDrawerLayer) {
       val drawerBmp = uiState.wallpaper.drawerBlurredBitmap ?: homeBmp
       Box(
         modifier = Modifier
           .fillMaxSize()
-          .graphicsLayer { alpha = drawerProgress }
+          .graphicsLayer { alpha = drawerProgressState.value }
       ) {
         if (drawerBmp != null) {
           Image(
@@ -158,7 +159,6 @@ fun LauncherRoot(
             modifier = Modifier.fillMaxSize()
           )
         }
-        // Soft frosted grey veil + balanced charcoal legibility scrim
         Box(
           modifier = Modifier
             .fillMaxSize()
@@ -171,13 +171,13 @@ fun LauncherRoot(
         Box(
           modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x68121215))
+            .background(DRAWER_CHARCOAL_SCRIM)
         )
       }
     }
 
-    // 3. App Drawer layer (renders sleek sliding entrance beneath Home's active scrub wave when scrubbing from Home)
-    if (drawerProgress > 0.005f && uiState.activeOverlay == LauncherOverlay.NONE) {
+    // 3. App Drawer layer (0 recompositions during transition)
+    if (showDrawerLayer && uiState.activeOverlay == LauncherOverlay.NONE) {
       AppDrawerScreen(
         uiState = uiState,
         iconCache = iconCache,
@@ -189,9 +189,10 @@ fun LauncherRoot(
         onSearchQueryChange = { viewModel.updateSearchQuery(it) },
         onCloseDrawer = { viewModel.closeDrawer() },
         modifier = Modifier.graphicsLayer {
-          alpha = drawerProgress
-          translationY = (1f - drawerProgress) * 72f
-          val scale = 0.96f + 0.04f * drawerProgress
+          val p = drawerProgressState.value
+          alpha = p
+          translationY = (1f - p) * 56f
+          val scale = 0.97f + 0.03f * p
           scaleX = scale
           scaleY = scale
         }
@@ -199,13 +200,12 @@ fun LauncherRoot(
     }
 
     // 4. Home Screen layer (stays alive during active Home Alphabet Rail drag so touch scrub never drops)
-    if ((drawerProgress < 0.995f || isHomeRailScrubbing) && uiState.activeOverlay == LauncherOverlay.NONE) {
+    if (showHomeLayer && uiState.activeOverlay == LauncherOverlay.NONE) {
       HomeScreen(
         uiState = uiState,
         clockSnapshot = clockSnapshot,
         iconCache = iconCache,
-        contentAlpha = (1f - drawerProgress * 1.25f).coerceIn(0f, 1f),
-        contentTranslationY = -drawerProgress * 40f,
+        drawerProgressProvider = { drawerProgressState.value },
         onOpenDrawer = { viewModel.openDrawer(withSearch = false) },
         onScrubToDrawerSection = { key ->
           isHomeRailScrubbing = true
@@ -235,7 +235,7 @@ fun LauncherRoot(
     }
 
     // 5. Secondary Settings / Customization overlays
-    val overlayFadeDuration = if (prefs.reducedMotion) 0 else 180
+    val overlayFadeDuration = if (prefs.reducedMotion) 0 else 160
     AnimatedVisibility(
       visible = uiState.activeOverlay == LauncherOverlay.SETTINGS,
       enter = fadeIn(tween(overlayFadeDuration)),
@@ -312,7 +312,7 @@ fun LauncherRoot(
     }
 
     // 6. Quick Actions Panel
-    val quickDuration = if (prefs.reducedMotion) 0 else 160
+    val quickDuration = if (prefs.reducedMotion) 0 else 150
     AnimatedVisibility(
       visible = uiState.showQuickActions,
       enter = fadeIn(tween(quickDuration)),
@@ -396,3 +396,13 @@ fun LauncherRoot(
     }
   }
 }
+
+private val BOTTOM_ATMOSPHERIC_SCRIM = Brush.verticalGradient(
+  colorStops = arrayOf(
+    0.0f to Color.Transparent,
+    0.55f to Color.Transparent,
+    1.0f to Color(0x780B0B0D)
+  )
+)
+
+private val DRAWER_CHARCOAL_SCRIM = Color(0x68121215)

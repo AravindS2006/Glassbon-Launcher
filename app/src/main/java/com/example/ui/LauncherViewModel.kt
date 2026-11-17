@@ -25,11 +25,13 @@ import com.example.platform.DefaultLauncherHelper
 import com.example.platform.GlassbonLockAccessibilityService
 import com.example.platform.GlassbonMediaListenerService
 import com.example.platform.SystemActionsHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -70,6 +72,17 @@ data class LauncherUiState(
   val statusMessage: String? = null
 )
 
+private data class DerivedAppsBundle(
+  val loading: Boolean,
+  val allApps: List<AppInfo>,
+  val visibleApps: List<AppInfo>,
+  val sections: List<AppSection>,
+  val favoriteApps: List<AppInfo>,
+  val homeShortcutApps: List<AppInfo>,
+  val hiddenApps: List<AppInfo>,
+  val prefs: LauncherPreferences
+)
+
 private data class TransientUiState(
   val searchQuery: String = "",
   val isDrawerOpen: Boolean = false,
@@ -107,46 +120,53 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     ProcessedWallpaper(homeBitmap = null, drawerBlurredBitmap = null, isTopBright = true)
   )
 
-  private val baseStateFlow = combine(
+  // Heavy grouping & filtering runs on Dispatchers.Default ONLY when apps or preferences change
+  private val derivedAppsFlow = combine(
     appRepository.apps,
     appRepository.isLoading,
-    preferencesRepository.preferences,
-    wallpaperState
-  ) { apps, loading, prefs, wallpaper ->
-    BaseStateBundle(apps, loading, prefs, wallpaper)
-  }
-
-  val uiState: StateFlow<LauncherUiState> = combine(
-    baseStateFlow,
-    transientState,
-    mediaRepository.mediaState
-  ) { base, transient, media ->
-    val allApps = base.apps
-    val prefs = base.prefs
+    preferencesRepository.preferences
+  ) { allApps, loading, prefs ->
     val appByKey = allApps.associateBy { it.componentKey }
     val hiddenSet = prefs.hiddenKeys
     val visibleApps = allApps.filterNot { it.componentKey in hiddenSet }
     val sections = AppIndexHelper.groupAppsBySection(visibleApps)
-
     val favoriteApps = prefs.favoriteKeys.mapNotNull { key -> appByKey[key] }
     val homeShortcutApps = favoriteApps.take(prefs.homeShortcutLimit)
     val hiddenApps = hiddenSet.mapNotNull { key -> appByKey[key] }
       .sortedBy { it.label.lowercase() }
 
-    val searchResults = if (transient.isSearchActive) {
-      AppIndexHelper.filterApps(visibleApps, transient.searchQuery)
-    } else {
-      emptyList()
-    }
-
-    LauncherUiState(
-      isLoading = base.loading,
+    DerivedAppsBundle(
+      loading = loading,
       allApps = allApps,
       visibleApps = visibleApps,
       sections = sections,
       favoriteApps = favoriteApps,
       homeShortcutApps = homeShortcutApps,
       hiddenApps = hiddenApps,
+      prefs = prefs
+    )
+  }.flowOn(Dispatchers.Default)
+
+  val uiState: StateFlow<LauncherUiState> = combine(
+    derivedAppsFlow,
+    wallpaperState,
+    transientState,
+    mediaRepository.mediaState
+  ) { derived, wallpaper, transient, media ->
+    val searchResults = if (transient.isSearchActive) {
+      AppIndexHelper.filterApps(derived.visibleApps, transient.searchQuery)
+    } else {
+      emptyList()
+    }
+
+    LauncherUiState(
+      isLoading = derived.loading,
+      allApps = derived.allApps,
+      visibleApps = derived.visibleApps,
+      sections = derived.sections,
+      favoriteApps = derived.favoriteApps,
+      homeShortcutApps = derived.homeShortcutApps,
+      hiddenApps = derived.hiddenApps,
       searchQuery = transient.searchQuery,
       searchResults = searchResults,
       isDrawerOpen = transient.isDrawerOpen,
@@ -160,8 +180,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       isLockAccessibilityEnabled = transient.isLockAccessibilityEnabled,
       isMediaListenerEnabled = transient.isMediaListenerEnabled,
       activeMedia = media,
-      preferences = prefs,
-      wallpaper = base.wallpaper,
+      preferences = derived.prefs,
+      wallpaper = wallpaper,
       statusMessage = transient.statusMessage
     )
   }.stateIn(
@@ -170,16 +190,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     initialValue = LauncherUiState()
   )
 
-  private data class BaseStateBundle(
-    val apps: List<AppInfo>,
-    val loading: Boolean,
-    val prefs: LauncherPreferences,
-    val wallpaper: ProcessedWallpaper
-  )
-
   init {
     appRepository.startObserving()
-    mediaRepository.startObserving()
 
     viewModelScope.launch {
       combine(appRepository.apps, preferencesRepository.preferences) { apps, prefs ->
@@ -249,8 +261,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     return chosen.toList()
   }
 
-  fun refreshSystemStatus() {
+  fun onAppStart() {
     mediaRepository.startObserving()
+    refreshSystemStatus()
+  }
+
+  fun onAppStop() {
+    mediaRepository.stopObserving()
+  }
+
+  fun refreshSystemStatus() {
     transientState.update {
       it.copy(
         isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
@@ -291,6 +311,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun updateDrawerJumpTarget(sectionKey: String?) {
+    if (transientState.value.drawerJumpTarget == sectionKey) return
     transientState.update { it.copy(drawerJumpTarget = sectionKey) }
   }
 

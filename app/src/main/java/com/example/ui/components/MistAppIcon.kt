@@ -1,8 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,15 +42,6 @@ fun MistAppIcon(
   isPressed: Boolean = false,
   reducedMotion: Boolean = false
 ) {
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed && !reducedMotion) 0.90f else 1f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioNoBouncy,
-      stiffness = Spring.StiffnessMedium
-    ),
-    label = "icon_press_scale"
-  )
-
   val cached = iconCache.getCached(app.componentKey, iconStyle)
   val iconBitmap by produceState<ImageBitmap?>(
     initialValue = cached,
@@ -64,51 +53,36 @@ fun MistAppIcon(
     }
   }
 
-  val cornerRadius = (tileSize.value * 0.30f).dp
-  val shape = RoundedCornerShape(cornerRadius)
-
-  val tileFillBrush = Brush.verticalGradient(
-    colors = listOf(MistColors.IconTileFillTop, MistColors.IconTileFillBottom)
-  )
-  val rimHighlightBrush = Brush.linearGradient(
-    colors = listOf(
-      MistColors.SpecularRimTop,
-      MistColors.SpecularRimMid,
-      MistColors.SpecularRimBottom
-    )
-  )
+  val shape = remember(tileSize) { RoundedCornerShape((tileSize.value * 0.30f).dp) }
+  val isGlassMono = iconStyle == IconStyle.DOT_MONO
 
   Box(
     modifier = modifier
       .size(tileSize)
       .graphicsLayer {
-        scaleX = scale
-        scaleY = scale
+        val s = if (isPressed && !reducedMotion) 0.92f else 1f
+        scaleX = s
+        scaleY = s
       }
       .clip(shape)
       .then(
-        if (iconStyle == IconStyle.DOT_MONO) {
+        if (isGlassMono) {
           Modifier
-            .background(tileFillBrush)
-            .border(width = 0.85.dp, brush = rimHighlightBrush, shape = shape)
+            .background(TILE_FILL_BRUSH)
+            .border(width = 0.8.dp, brush = RIM_HIGHLIGHT_BRUSH, shape = shape)
         } else {
           Modifier
         }
       ),
     contentAlignment = Alignment.Center
   ) {
-    // Top liquid-glass inner sheen
-    if (iconStyle == IconStyle.DOT_MONO) {
+    if (isGlassMono) {
       Box(
         modifier = Modifier
           .align(Alignment.TopCenter)
           .fillMaxWidth()
-          .height(tileSize * 0.42f)
-          .background(
-            Brush.verticalGradient(
-              colors = listOf(MistColors.InnerTopSheen, Color.Transparent)
-            )
-          )
+          .height(tileSize * 0.40f)
+          .background(INNER_SHEEN_BRUSH)
       )
     }
 
@@ -120,7 +94,7 @@ fun MistAppIcon(
         contentScale = ContentScale.Fit,
         modifier = Modifier
           .fillMaxSize()
-          .padding(if (iconStyle == IconStyle.DOT_MONO) (tileSize.value * 0.20f).dp else 0.dp)
+          .padding(if (isGlassMono) (tileSize.value * 0.19f).dp else 0.dp)
       )
     } else {
       Text(
@@ -132,3 +106,19 @@ fun MistAppIcon(
     }
   }
 }
+
+private val TILE_FILL_BRUSH = Brush.verticalGradient(
+  colors = listOf(MistColors.IconTileFillTop, MistColors.IconTileFillBottom)
+)
+
+private val RIM_HIGHLIGHT_BRUSH = Brush.linearGradient(
+  colors = listOf(
+    MistColors.SpecularRimTop,
+    MistColors.SpecularRimMid,
+    MistColors.SpecularRimBottom
+  )
+)
+
+private val INNER_SHEEN_BRUSH = Brush.verticalGradient(
+  colors = listOf(MistColors.InnerTopSheen, Color.Transparent)
+)

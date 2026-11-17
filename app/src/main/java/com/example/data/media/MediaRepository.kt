@@ -13,9 +13,15 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.platform.GlassbonMediaListenerService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 @Immutable
@@ -32,6 +38,7 @@ data class ActiveMediaState(
 
 class MediaRepository(private val context: Context) {
 
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
   private val mainHandler = Handler(Looper.getMainLooper())
   private val sessionManager =
     context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
@@ -41,6 +48,9 @@ class MediaRepository(private val context: Context) {
 
   private var activeController: MediaController? = null
   private var listening = false
+  private var cachedTrackKey: String? = null
+  private var cachedArtwork: ImageBitmap? = null
+  private var artworkJob: Job? = null
 
   private val controllerCallback = object : MediaController.Callback() {
     override fun onPlaybackStateChanged(state: PlaybackState?) {
@@ -81,6 +91,8 @@ class MediaRepository(private val context: Context) {
   }
 
   fun stopObserving() {
+    artworkJob?.cancel()
+    artworkJob = null
     if (listening) {
       runCatching { sessionManager?.removeOnActiveSessionsChangedListener(sessionsListener) }
       listening = false
@@ -157,6 +169,9 @@ class MediaRepository(private val context: Context) {
 
   private fun publishControllerState(controller: MediaController?) {
     if (controller == null) {
+      artworkJob?.cancel()
+      cachedTrackKey = null
+      cachedArtwork = null
       _mediaState.value = ActiveMediaState(hasPermission = true, hasSession = false)
       return
     }
@@ -167,28 +182,76 @@ class MediaRepository(private val context: Context) {
       ?: "").trim()
 
     if (title.isEmpty()) {
+      artworkJob?.cancel()
+      cachedTrackKey = null
+      cachedArtwork = null
       _mediaState.value = ActiveMediaState(hasPermission = true, hasSession = false)
+      return
+    }
+
+    val pbState = controller.playbackState?.state
+    val isPlaying = pbState == PlaybackState.STATE_PLAYING || pbState == PlaybackState.STATE_BUFFERING
+    val trackKey = "$title|$artist|${controller.packageName}"
+
+    // Reuse cached artwork when only play/pause state updates so UI stays 0ms latency
+    if (trackKey == cachedTrackKey && cachedArtwork != null) {
+      _mediaState.value = ActiveMediaState(
+        hasPermission = true,
+        hasSession = true,
+        isPlaying = isPlaying,
+        title = title,
+        artist = artist,
+        artwork = cachedArtwork,
+        trackKey = trackKey,
+        packageName = controller.packageName
+      )
       return
     }
 
     val rawArt = meta?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
       ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_ART)
       ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-    val scaledArt = rawArt?.let { downscaleArtwork(it, 220) }?.asImageBitmap()
 
-    val pbState = controller.playbackState?.state
-    val isPlaying = pbState == PlaybackState.STATE_PLAYING || pbState == PlaybackState.STATE_BUFFERING
+    if (rawArt == null) {
+      cachedTrackKey = trackKey
+      cachedArtwork = null
+      _mediaState.value = ActiveMediaState(
+        hasPermission = true,
+        hasSession = true,
+        isPlaying = isPlaying,
+        title = title,
+        artist = artist,
+        artwork = null,
+        trackKey = trackKey,
+        packageName = controller.packageName
+      )
+      return
+    }
 
+    // Publish text/playback immediately, downscale artwork off-main-thread
     _mediaState.value = ActiveMediaState(
       hasPermission = true,
       hasSession = true,
       isPlaying = isPlaying,
       title = title,
       artist = artist,
-      artwork = scaledArt,
-      trackKey = "$title|$artist|${controller.packageName}",
+      artwork = if (trackKey == cachedTrackKey) cachedArtwork else _mediaState.value.artwork,
+      trackKey = trackKey,
       packageName = controller.packageName
     )
+
+    artworkJob?.cancel()
+    artworkJob = scope.launch {
+      val scaled = withContext(Dispatchers.Default) {
+        downscaleArtwork(rawArt, 180).asImageBitmap()
+      }
+      cachedTrackKey = trackKey
+      cachedArtwork = scaled
+      _mediaState.value = _mediaState.value.copy(
+        artwork = scaled,
+        trackKey = trackKey
+      )
+    }
   }
 
   private fun downscaleArtwork(bitmap: Bitmap, maxDim: Int): Bitmap {

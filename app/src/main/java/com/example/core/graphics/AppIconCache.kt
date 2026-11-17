@@ -63,7 +63,7 @@ class AppIconCache(private val context: Context) {
 
   private fun renderIconBitmap(app: AppInfo, style: IconStyle): Bitmap? {
     val drawable = resolveDrawable(app) ?: return null
-    val sizePx = 96
+    val sizePx = 72
 
     return when (style) {
       IconStyle.ORIGINAL -> renderOriginalDrawable(drawable, sizePx)

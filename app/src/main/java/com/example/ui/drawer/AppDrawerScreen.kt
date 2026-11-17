@@ -2,8 +2,9 @@ package com.example.ui.drawer
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -53,8 +54,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +65,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -109,6 +114,37 @@ fun AppDrawerScreen(
   val coroutineScope = rememberCoroutineScope()
   val focusManager = LocalFocusManager.current
   val keyboardController = LocalSoftwareKeyboardController.current
+  val density = LocalDensity.current
+
+  // Niagara-style lightweight horizontal glide when scrubbing sections (single GPU transform on list)
+  var isRailDragging by remember { mutableStateOf(false) }
+  val listSlideOffsetX = remember { Animatable(0f) }
+  val listDragShiftX = remember { Animatable(0f) }
+  val scrubNudgePx = with(density) { 14.dp.toPx() }
+  val dragPullPx = with(density) { 10.dp.toPx() }
+
+  LaunchedEffect(isRailDragging || hideAlphabetRail, prefs.reducedMotion) {
+    val targetShift = if ((isRailDragging || hideAlphabetRail) && !prefs.reducedMotion) -dragPullPx else 0f
+    if (prefs.reducedMotion) {
+      listDragShiftX.snapTo(0f)
+    } else {
+      listDragShiftX.animateTo(
+        targetValue = targetShift,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+      )
+    }
+  }
+
+  fun triggerSectionSlide() {
+    if (prefs.reducedMotion) return
+    coroutineScope.launch {
+      listSlideOffsetX.snapTo(scrubNudgePx)
+      listSlideOffsetX.animateTo(
+        targetValue = 0f,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+      )
+    }
+  }
 
   BackHandler(enabled = uiState.isDrawerOpen) {
     if (uiState.isSearchActive) {
@@ -120,7 +156,6 @@ fun AppDrawerScreen(
     }
   }
 
-  // Build flat index map for section jumping ("★" -> index 0 if favorites exist, or section letter -> item index)
   val sectionIndexMap = remember(uiState.sections, uiState.favoriteApps) {
     val map = LinkedHashMap<String, Int>()
     var cursor = 0
@@ -141,13 +176,13 @@ fun AppDrawerScreen(
     val index = findNearestSectionIndex(target, sectionIndexMap)
     if (index != null) {
       listState.scrollToItem(index)
+      triggerSectionSlide()
     }
     if (!hideAlphabetRail) {
       onJumpTargetHandled()
     }
   }
 
-  // Track which section is currently at the top of the viewport for AlphabetRail highlighting
   val activeIndexKey by remember(sectionIndexMap) {
     derivedStateOf {
       val firstVisible = listState.firstVisibleItemIndex
@@ -176,10 +211,9 @@ fun AppDrawerScreen(
       .imePadding()
   ) {
     Column(modifier = Modifier.fillMaxSize()) {
-      // Subtle top bar: tap handle to return Home or active search bar when searching
       AnimatedContent(
         targetState = uiState.isSearchActive,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(120)) },
         label = "drawer_header_transition"
       ) { searching ->
         if (searching) {
@@ -204,7 +238,6 @@ fun AppDrawerScreen(
               .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 8.dp)
           )
         } else {
-          // Minimal top return-home pill (discreet, zero clutter)
           Box(
             modifier = Modifier
               .fillMaxWidth()
@@ -253,11 +286,14 @@ fun AppDrawerScreen(
             onLongPressApp = onLongPressApp
           )
         } else {
-          // Main alphabetical editorial app library with smooth sliding item placement
+          // Hardware-accelerated LazyColumn (no per-row animateItem overhead) with Niagara-style list slide
           LazyColumn(
             state = listState,
             modifier = Modifier
               .fillMaxSize()
+              .graphicsLayer {
+                translationX = listSlideOffsetX.value + listDragShiftX.value
+              }
               .testTag("drawer_app_list"),
             contentPadding = PaddingValues(
               start = 24.dp,
@@ -267,69 +303,45 @@ fun AppDrawerScreen(
             )
           ) {
             if (uiState.favoriteApps.isNotEmpty()) {
-              item(key = "header_favorites") {
+              item(key = "header_favorites", contentType = "header") {
                 DrawerSectionHeader(
                   title = stringResource(R.string.favorites_section_title),
-                  modifier = Modifier
-                    .animateItem(
-                      placementSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                      )
-                    )
-                    .padding(top = 8.dp, bottom = 6.dp)
+                  modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)
                 )
               }
               items(
                 items = uiState.favoriteApps,
-                key = { "fav_${it.componentKey}" }
+                key = { "fav_${it.componentKey}" },
+                contentType = { "app_row" }
               ) { app ->
                 DrawerAppRow(
                   app = app,
                   uiState = uiState,
                   iconCache = iconCache,
                   onClick = { onLaunchApp(app) },
-                  onLongClick = { onLongPressApp(app) },
-                  modifier = Modifier.animateItem(
-                    placementSpec = spring(
-                      dampingRatio = Spring.DampingRatioNoBouncy,
-                      stiffness = Spring.StiffnessMediumLow
-                    )
-                  )
+                  onLongClick = { onLongPressApp(app) }
                 )
               }
             }
 
             for (section in uiState.sections) {
-              item(key = "section_${section.header}") {
+              item(key = "section_${section.header}", contentType = "header") {
                 DrawerSectionHeader(
                   title = section.header,
-                  modifier = Modifier
-                    .animateItem(
-                      placementSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                      )
-                    )
-                    .padding(top = 20.dp, bottom = 6.dp)
+                  modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)
                 )
               }
               items(
                 items = section.apps,
-                key = { "${section.header}_${it.componentKey}" }
+                key = { "${section.header}_${it.componentKey}" },
+                contentType = { "app_row" }
               ) { app ->
                 DrawerAppRow(
                   app = app,
                   uiState = uiState,
                   iconCache = iconCache,
                   onClick = { onLaunchApp(app) },
-                  onLongClick = { onLongPressApp(app) },
-                  modifier = Modifier.animateItem(
-                    placementSpec = spring(
-                      dampingRatio = Spring.DampingRatioNoBouncy,
-                      stiffness = Spring.StiffnessMediumLow
-                    )
-                  )
+                  onLongClick = { onLongPressApp(app) }
                 )
               }
             }
@@ -350,11 +362,13 @@ fun AppDrawerScreen(
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 reducedMotion = prefs.reducedMotion,
+                onDraggingChanged = { isRailDragging = it },
                 onSelectKey = { targetKey ->
                   val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
                   if (targetIndex != null) {
                     coroutineScope.launch {
                       listState.scrollToItem(targetIndex)
+                      triggerSectionSlide()
                     }
                   }
                 }
@@ -365,7 +379,6 @@ fun AppDrawerScreen(
       }
     }
 
-    // Bottom-right floating circular search control (shown when search isn't already open)
     if (!uiState.isSearchActive) {
       FloatingCircleButton(
         icon = Icons.Rounded.Search,
@@ -404,7 +417,7 @@ private fun DrawerSectionHeader(
   Text(
     text = title,
     fontFamily = EditorialDisplayFontFamily,
-    fontSize = 18.sp,
+    fontSize = 19.sp,
     letterSpacing = 0.6.sp,
     color = MistColors.OffWhite.copy(alpha = 0.72f),
     modifier = modifier.padding(start = 4.dp)
@@ -613,20 +626,15 @@ private fun SearchResultsList(
     ) {
       items(
         items = results,
-        key = { "search_${it.componentKey}" }
+        key = { "search_${it.componentKey}" },
+        contentType = { "app_row" }
       ) { app ->
         DrawerAppRow(
           app = app,
           uiState = uiState,
           iconCache = iconCache,
           onClick = { onLaunchApp(app) },
-          onLongClick = { onLongPressApp(app) },
-          modifier = Modifier.animateItem(
-            placementSpec = spring(
-              dampingRatio = Spring.DampingRatioNoBouncy,
-              stiffness = Spring.StiffnessMediumLow
-            )
-          )
+          onLongClick = { onLongPressApp(app) }
         )
       }
     }

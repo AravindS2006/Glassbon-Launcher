@@ -55,9 +55,19 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun onStart() {
+    super.onStart()
+    viewModel.onAppStart()
+  }
+
   override fun onResume() {
     super.onResume()
     viewModel.refreshSystemStatus()
+  }
+
+  override fun onStop() {
+    super.onStop()
+    viewModel.onAppStop()
   }
 
   override fun onNewIntent(intent: Intent) {

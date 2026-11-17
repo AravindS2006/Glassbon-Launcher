@@ -1,13 +1,10 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,6 +22,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -56,6 +53,7 @@ import com.example.data.apps.AppIndexHelper
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
 
@@ -71,42 +69,59 @@ fun AlphabetRail(
   modifier: Modifier = Modifier,
   invisibleMode: Boolean = false,
   reducedMotion: Boolean = false,
+  onDraggingChanged: (Boolean) -> Unit = {},
   onDragEnd: () -> Unit = {}
 ) {
   val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
   val haptics = LocalHapticFeedback.current
   val density = LocalDensity.current
 
-  var railHeightPx by remember { mutableIntStateOf(1) }
+  val railHeightPxState = remember { mutableIntStateOf(1) }
   var isDragging by remember { mutableStateOf(false) }
-  var pointerY by remember { mutableFloatStateOf(-1f) }
+  val pointerYState = remember { mutableFloatStateOf(-1f) }
   var lastSelectedIndex by remember { mutableIntStateOf(-1) }
   var scrubbedKey by remember { mutableStateOf<String?>(null) }
 
-  val maxCurvePx = with(density) { 36.dp.toPx() }
-  val sigmaPx = with(density) { 46.dp.toPx() }
-  val bubbleHalfSizePx = with(density) { 26.dp.toPx() }
+  val waveStrength = remember { Animatable(0f) }
 
-  val waveStrength by animateFloatAsState(
-    targetValue = if (isDragging && !reducedMotion) 1f else 0f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioNoBouncy,
-      stiffness = Spring.StiffnessMediumLow
-    ),
-    label = "alphabet_wave_strength"
-  )
+  LaunchedEffect(isDragging, reducedMotion) {
+    onDraggingChanged(isDragging)
+    if (reducedMotion) {
+      waveStrength.snapTo(if (isDragging) 1f else 0f)
+    } else if (isDragging) {
+      waveStrength.animateTo(
+        targetValue = 1f,
+        animationSpec = spring(
+          dampingRatio = 0.72f,
+          stiffness = Spring.StiffnessMedium
+        )
+      )
+    } else {
+      waveStrength.animateTo(
+        targetValue = 0f,
+        animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing)
+      )
+    }
+  }
+
+  val maxCurvePx = with(density) { 40.dp.toPx() }
+  val sigmaPx = with(density) { 52.dp.toPx() }
+  val bubbleHalfSizePx = with(density) { 27.dp.toPx() }
+  val bubbleBaseOffsetXPx = with(density) { 78.dp.roundToPx() }
+  val bubbleSwingXPx = with(density) { 16.dp.toPx() }
 
   fun dispatchIndexForY(y: Float) {
-    if (railHeightPx <= 0) return
-    val clampedY = y.coerceIn(0f, railHeightPx.toFloat())
-    pointerY = clampedY
-    val idx = ((clampedY / railHeightPx.toFloat()) * entries.size)
+    val heightPx = railHeightPxState.intValue
+    if (heightPx <= 0) return
+    val clampedY = y.coerceIn(0f, heightPx.toFloat())
+    pointerYState.floatValue = clampedY
+    val idx = ((clampedY / heightPx.toFloat()) * entries.size)
       .toInt()
       .coerceIn(0, entries.lastIndex)
-    val selected = entries[idx]
-    scrubbedKey = selected
     if (idx != lastSelectedIndex) {
       lastSelectedIndex = idx
+      val selected = entries[idx]
+      scrubbedKey = selected
       if (hapticEnabled) {
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
       }
@@ -117,66 +132,60 @@ fun AlphabetRail(
   Box(
     modifier = modifier
       .testTag("alphabet_rail")
-      .width(if (invisibleMode && !isDragging) 28.dp else 44.dp),
+      .width(42.dp),
     contentAlignment = Alignment.CenterEnd
   ) {
-    // Floating frosted circular letter indicator beside the curved wave
-    val displayBubbleKey = scrubbedKey ?: activeKey
-    val bubbleY = if (pointerY >= 0f) {
-      (pointerY - bubbleHalfSizePx).coerceIn(0f, (railHeightPx - bubbleHalfSizePx * 2).coerceAtLeast(0f))
-    } else {
-      0f
-    }
-
-    AnimatedVisibility(
-      visible = isDragging && displayBubbleKey != null,
-      enter = fadeIn() + scaleIn(initialScale = 0.8f),
-      exit = fadeOut() + scaleOut(targetScale = 0.8f),
+    // Floating frosted circular letter bubble tracking finger in pure graphics/layout phase (0 recompositions)
+    val bubbleKey = scrubbedKey ?: activeKey
+    Box(
       modifier = Modifier
         .align(Alignment.TopEnd)
         .offset {
-          IntOffset(
-            x = -with(density) { 74.dp.roundToPx() },
-            y = bubbleY.roundToInt()
-          )
+          val h = railHeightPxState.intValue.toFloat()
+          val py = pointerYState.floatValue
+          val y = if (py >= 0f) {
+            (py - bubbleHalfSizePx).coerceIn(0f, (h - bubbleHalfSizePx * 2).coerceAtLeast(0f))
+          } else {
+            0f
+          }
+          val w = waveStrength.value
+          val x = -(bubbleBaseOffsetXPx + (bubbleSwingXPx * w)).roundToInt()
+          IntOffset(x = x, y = y.roundToInt())
         }
+        .graphicsLayer {
+          val w = waveStrength.value
+          alpha = w
+          val s = 0.72f + (0.28f * w)
+          scaleX = s
+          scaleY = s
+        }
+        .size(54.dp)
+        .clip(CircleShape)
+        .background(MistColors.AlphabetBubbleFill)
+        .border(width = 0.9.dp, brush = BUBBLE_RIM_BRUSH, shape = CircleShape),
+      contentAlignment = Alignment.Center
     ) {
-      Box(
-        modifier = Modifier
-          .size(52.dp)
-          .clip(CircleShape)
-          .background(MistColors.AlphabetBubbleFill)
-          .border(
-            width = 0.9.dp,
-            brush = Brush.linearGradient(
-              listOf(MistColors.SpecularRimTop, MistColors.SpecularRimMid, MistColors.SpecularRimBottom)
-            ),
-            shape = CircleShape
-          ),
-        contentAlignment = Alignment.Center
-      ) {
-        if (displayBubbleKey == FAVORITES_INDEX_KEY) {
-          Icon(
-            imageVector = Icons.Rounded.Star,
-            contentDescription = null,
-            tint = MistColors.PureWhite,
-            modifier = Modifier.size(22.dp)
-          )
-        } else {
-          Text(
-            text = displayBubbleKey.orEmpty(),
-            fontFamily = EditorialDisplayFontFamily,
-            fontSize = 28.sp,
-            color = MistColors.PureWhite
-          )
-        }
+      if (bubbleKey == FAVORITES_INDEX_KEY) {
+        Icon(
+          imageVector = Icons.Rounded.Star,
+          contentDescription = null,
+          tint = MistColors.PureWhite,
+          modifier = Modifier.size(22.dp)
+        )
+      } else {
+        Text(
+          text = bubbleKey.orEmpty(),
+          fontFamily = EditorialDisplayFontFamily,
+          fontSize = 29.sp,
+          color = MistColors.PureWhite
+        )
       }
     }
 
     Column(
       modifier = Modifier
-        .width(34.dp)
-        .onSizeChanged { railHeightPx = it.height }
+        .width(36.dp)
+        .onSizeChanged { railHeightPxState.intValue = it.height }
         .pointerInput(entries) {
           detectTapGestures { offset ->
             lastSelectedIndex = -1
@@ -209,37 +218,44 @@ fun AlphabetRail(
             dispatchIndexForY(change.position.y)
           }
         }
-        .alpha(if (invisibleMode && !isDragging) 0f else 1f)
         .padding(vertical = 4.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
+      val favCd = stringResource(R.string.cd_favorites_index)
       entries.forEachIndexed { index, key ->
-        val isActive = key == (if (isDragging) scrubbedKey else activeKey)
+        val isActive = key == (scrubbedKey ?: activeKey)
         val isAvailable = when (key) {
           FAVORITES_INDEX_KEY -> hasFavorites
           else -> key in availableSections
         }
-        val favCd = stringResource(R.string.cd_favorites_index)
-
-        // Compute Gaussian arc offset around active pointer position
-        val letterCenterY = ((index + 0.5f) / entries.size.toFloat()) * railHeightPx.toFloat()
-        val dist = if (pointerY >= 0f) kotlin.math.abs(letterCenterY - pointerY) else 10_000f
-        val gaussian = exp(-(dist * dist) / (2f * sigmaPx * sigmaPx))
-        val targetOffsetX = -maxCurvePx * gaussian * waveStrength
-        val letterScale = 1f + (0.42f * gaussian * waveStrength)
 
         Box(
           modifier = Modifier
             .size(width = 26.dp, height = 18.dp)
             .graphicsLayer {
-              translationX = targetOffsetX
-              scaleX = letterScale
-              scaleY = letterScale
+              val w = waveStrength.value
+              val py = pointerYState.floatValue
+              val h = railHeightPxState.intValue.toFloat()
+              if (w > 0.001f && py >= 0f && h > 0f) {
+                val letterCenterY = ((index + 0.5f) / entries.size.toFloat()) * h
+                val dist = abs(letterCenterY - py)
+                val gaussian = exp(-(dist * dist) / (2f * sigmaPx * sigmaPx))
+                translationX = -maxCurvePx * gaussian * w
+                val s = 1f + (0.44f * gaussian * w)
+                scaleX = s
+                scaleY = s
+                alpha = if (invisibleMode) w else (0.72f + 0.28f * gaussian * w)
+              } else {
+                translationX = 0f
+                scaleX = 1f
+                scaleY = 1f
+                alpha = if (invisibleMode) 0f else 1f
+              }
             }
             .clip(CircleShape)
             .background(
-              if (isActive && !isDragging) Color(0x36FFFFFF) else Color.Transparent
+              if (isActive && !isDragging && !invisibleMode) Color(0x36FFFFFF) else Color.Transparent
             )
             .semantics {
               contentDescription = if (key == FAVORITES_INDEX_KEY) favCd else "Jump to $key"
@@ -276,3 +292,7 @@ fun AlphabetRail(
     }
   }
 }
+
+private val BUBBLE_RIM_BRUSH = Brush.linearGradient(
+  listOf(MistColors.SpecularRimTop, MistColors.SpecularRimMid, MistColors.SpecularRimBottom)
+)

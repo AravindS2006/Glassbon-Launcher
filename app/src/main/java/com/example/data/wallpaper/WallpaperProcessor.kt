@@ -29,22 +29,18 @@ data class ProcessedWallpaper(
 
 class WallpaperProcessor(private val context: Context) {
 
-  private var cachedConfigKey: String? = null
-  private var cachedResult: ProcessedWallpaper? = null
-
   suspend fun persistPickedWallpaper(uri: Uri): String? = withContext(Dispatchers.IO) {
     val dir = File(context.filesDir, "wallpapers").apply { mkdirs() }
     val targetFile = File(dir, "custom_wallpaper_${System.currentTimeMillis()}.jpg")
 
-    // Clean older custom wallpapers
     dir.listFiles()?.forEach { old ->
       if (old.name.startsWith("custom_wallpaper_")) old.delete()
     }
 
-    val decoded = decodeSampledFromUri(uri, maxDimension = 1600) ?: return@withContext null
+    val decoded = decodeSampledFromUri(uri, maxDimension = 1280) ?: return@withContext null
     return@withContext try {
       FileOutputStream(targetFile).use { out ->
-        decoded.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        decoded.compress(Bitmap.CompressFormat.JPEG, 90, out)
       }
       targetFile.absolutePath
     } catch (_: Exception) {
@@ -57,8 +53,10 @@ class WallpaperProcessor(private val context: Context) {
   fun clearCustomWallpaperFiles() {
     val dir = File(context.filesDir, "wallpapers")
     dir.listFiles()?.forEach { it.delete() }
-    cachedConfigKey = null
-    cachedResult = null
+    synchronized(cacheLock) {
+      cachedConfigKey = null
+      cachedResult = null
+    }
   }
 
   suspend fun loadProcessedWallpaper(
@@ -69,14 +67,16 @@ class WallpaperProcessor(private val context: Context) {
   ): ProcessedWallpaper = withContext(Dispatchers.IO) {
     val blurBucket = if (lowEffectsMode) 0 else (blurIntensity * 10).toInt()
     val configKey = "${customPath ?: "default"}|$grayscale|$blurBucket|$lowEffectsMode"
-    if (configKey == cachedConfigKey && cachedResult != null) {
-      return@withContext cachedResult!!
+    synchronized(cacheLock) {
+      if (configKey == cachedConfigKey && cachedResult != null) {
+        return@withContext cachedResult!!
+      }
     }
 
-    val sourceBitmap = loadSourceBitmap(customPath, maxDimension = 1440)
+    val sourceBitmap = loadSourceBitmap(customPath, maxDimension = 1280)
       ?: return@withContext ProcessedWallpaper(null, null, isTopBright = true)
 
-    val processedHome = if (grayscale) applyGrayscale(sourceBitmap) else sourceBitmap
+    val processedHome = renderOptimizedHomeBitmap(sourceBitmap, grayscale)
     if (processedHome !== sourceBitmap) {
       sourceBitmap.recycle()
     }
@@ -86,7 +86,7 @@ class WallpaperProcessor(private val context: Context) {
     val drawerBitmap = if (lowEffectsMode || blurIntensity <= 0.05f) {
       processedHome
     } else {
-      val blurRadius = (6 + (blurIntensity * 16f)).toInt().coerceIn(4, 24)
+      val blurRadius = (5 + (blurIntensity * 13f)).toInt().coerceIn(4, 18)
       createBlurredVariant(processedHome, blurRadius)
     }
 
@@ -95,8 +95,10 @@ class WallpaperProcessor(private val context: Context) {
       drawerBlurredBitmap = drawerBitmap.asImageBitmap(),
       isTopBright = topBright
     )
-    cachedConfigKey = configKey
-    cachedResult = result
+    synchronized(cacheLock) {
+      cachedConfigKey = configKey
+      cachedResult = result
+    }
     result
   }
 
@@ -117,7 +119,7 @@ class WallpaperProcessor(private val context: Context) {
     val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
     val opts = BitmapFactory.Options().apply {
       inSampleSize = sampleSize
-      inPreferredConfig = Bitmap.Config.ARGB_8888
+      inPreferredConfig = Bitmap.Config.RGB_565
     }
     return BitmapFactory.decodeResource(context.resources, resId, opts)
   }
@@ -128,7 +130,7 @@ class WallpaperProcessor(private val context: Context) {
     val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
     val opts = BitmapFactory.Options().apply {
       inSampleSize = sampleSize
-      inPreferredConfig = Bitmap.Config.ARGB_8888
+      inPreferredConfig = Bitmap.Config.RGB_565
     }
     return BitmapFactory.decodeFile(file.absolutePath, opts)
   }
@@ -142,7 +144,7 @@ class WallpaperProcessor(private val context: Context) {
     val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
     val opts = BitmapFactory.Options().apply {
       inSampleSize = sampleSize
-      inPreferredConfig = Bitmap.Config.ARGB_8888
+      inPreferredConfig = Bitmap.Config.RGB_565
     }
     return context.contentResolver.openInputStream(uri)?.use { stream ->
       BitmapFactory.decodeStream(stream, null, opts)
@@ -158,12 +160,14 @@ class WallpaperProcessor(private val context: Context) {
     return inSampleSize.coerceAtLeast(1)
   }
 
-  private fun applyGrayscale(source: Bitmap): Bitmap {
-    val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+  private fun renderOptimizedHomeBitmap(source: Bitmap, grayscale: Boolean): Bitmap {
+    if (!grayscale && source.config == Bitmap.Config.RGB_565) return source
+    val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.RGB_565)
     val canvas = Canvas(out)
-    val matrix = ColorMatrix().apply { setSaturation(0f) }
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-      colorFilter = ColorMatrixColorFilter(matrix)
+    val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    if (grayscale) {
+      val matrix = ColorMatrix().apply { setSaturation(0f) }
+      paint.colorFilter = ColorMatrixColorFilter(matrix)
     }
     canvas.drawBitmap(source, 0f, 0f, paint)
     return out
@@ -174,8 +178,8 @@ class WallpaperProcessor(private val context: Context) {
     val sampleH = min(bitmap.height, max(1, (bitmap.height * 0.24f).toInt()))
     var sumLum = 0.0
     var count = 0
-    val stepX = max(1, sampleW / 16)
-    val stepY = max(1, sampleH / 16)
+    val stepX = max(1, sampleW / 12)
+    val stepY = max(1, sampleH / 12)
     for (y in 0 until sampleH step stepY) {
       for (x in 0 until sampleW step stepX) {
         val px = bitmap.getPixel(x, y)
@@ -188,16 +192,12 @@ class WallpaperProcessor(private val context: Context) {
     return avg > 0.58
   }
 
-  /**
-   * Generates a low-resolution pre-blurred static bitmap for the frosted-glass drawer.
-   * Downsampling before box-blurring keeps work <15ms off the main thread and prevents per-frame GPU blur.
-   */
   private fun createBlurredVariant(source: Bitmap, radius: Int): Bitmap {
-    val targetWidth = 220
+    val targetWidth = 180
     val aspect = source.height.toFloat() / source.width.toFloat().coerceAtLeast(1f)
-    val targetHeight = (targetWidth * aspect).toInt().coerceIn(120, 480)
+    val targetHeight = (targetWidth * aspect).toInt().coerceIn(100, 380)
     val small = Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
-    return fastBoxBlur(small, radius.coerceIn(2, 24))
+    return fastBoxBlur(small, radius.coerceIn(2, 18))
   }
 
   private fun fastBoxBlur(bitmap: Bitmap, radius: Int): Bitmap {
@@ -207,9 +207,7 @@ class WallpaperProcessor(private val context: Context) {
     bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
     val temp = IntArray(w * h)
 
-    // 2-pass separable box blur closely approximates Gaussian diffusion at very low CPU cost
     repeat(2) {
-      // Horizontal pass
       for (y in 0 until h) {
         var rSum = 0
         var gSum = 0
@@ -236,7 +234,6 @@ class WallpaperProcessor(private val context: Context) {
           bSum += (addPx and 0xFF) - (subPx and 0xFF)
         }
       }
-      // Vertical pass
       for (x in 0 until w) {
         var rSum = 0
         var gSum = 0
@@ -264,9 +261,15 @@ class WallpaperProcessor(private val context: Context) {
       }
     }
 
-    val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val result = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
     result.setPixels(pixels, 0, w, 0, 0, w, h)
     if (bitmap !== result) bitmap.recycle()
     return result
+  }
+
+  private companion object {
+    val cacheLock = Any()
+    var cachedConfigKey: String? = null
+    var cachedResult: ProcessedWallpaper? = null
   }
 }
