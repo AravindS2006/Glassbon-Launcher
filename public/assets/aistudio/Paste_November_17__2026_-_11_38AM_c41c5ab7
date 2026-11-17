@@ -1,0 +1,1160 @@
+# MASTER PRODUCT & ENGINEERING SPECIFICATION
+# Minimalist Frosted Glass Android Launcher
+
+## 1. PROJECT OVERVIEW
+
+Build a complete, production-quality native Android launcher application with an extremely minimal, sophisticated, monochromatic aesthetic inspired by the supplied reference screenshots.
+
+The application should feel like a combination of:
+- Apple's design philosophy: simplicity, precision, refinement, and carefully considered motion.
+- Modern frosted-glass design: translucent surfaces, soft diffusion, subtle highlights, and atmospheric depth.
+- Minimalist Android launcher functionality: instant access to applications, searchable app library, favorites, and a customizable home screen.
+- A distinctive monochrome dot-inspired icon system.
+
+This must be a FUNCTIONAL ANDROID LAUNCHER, not a static UI prototype, Figma recreation, or demonstration screen.
+
+The result should be a genuinely usable Android application that can be installed, selected as the device's default Home application, and used every day.
+
+### Product philosophy
+
+The launcher should feel:
+- Minimal, but not empty.
+- Premium, but not complicated.
+- Beautiful, but not resource-intensive.
+- Smooth, but not animation-heavy.
+- Customizable, but not overwhelming.
+- Modern, but timeless.
+
+The defining characteristic is visual restraint.
+
+Every element must have a purpose. Avoid unnecessary cards, widgets, gradients, buttons, decorative borders, excessive rounded rectangles, and unnecessary information.
+
+The UI should make the wallpaper, typography, icons, and whitespace work together.
+
+---
+
+# 2. UNDERSTANDING THE REFERENCE SCREENSHOTS
+
+Treat the three supplied screenshots as the primary visual references.
+
+There are two primary interfaces.
+
+## A. HOME SCREEN
+
+The first screenshot demonstrates the desired home screen.
+
+Its visual characteristics:
+
+1. A full-screen monochromatic grayscale forest wallpaper.
+2. A misty, fog-covered atmosphere with tall pine trees.
+3. Darker forest silhouettes in the lower half.
+4. A large, elegant serif clock in the upper-left area.
+5. A smaller date label directly underneath the clock.
+6. A vertical strip of favorite application shortcuts along the left side.
+7. Small, dark, rounded-square shortcut containers with minimal white iconography.
+8. Large amounts of empty space.
+9. A floating circular power-symbol control near the bottom-right corner.
+10. Native Android status bar elements remain visible.
+
+The home screen must NOT resemble a conventional Android launcher with a grid of applications, widgets, and a large bottom dock.
+
+The design should be considerably more restrained.
+
+### Home screen composition
+
+**Wallpaper**
+- Full-screen background image.
+- Monochrome or grayscale rendering.
+- Foggy forest aesthetic.
+- Top portion relatively bright and atmospheric.
+- Middle portion contains partially visible tree silhouettes.
+- Bottom portion transitions into a deep charcoal/black forest.
+- Subtle dark gradient near the bottom to preserve contrast.
+- The wallpaper must cover the entire available screen.
+
+**Clock**
+- Position: upper-left area.
+- Prominent size.
+- Elegant serif typography.
+- Regular font weight.
+- No unnecessary decorative effects.
+- Display the actual device time.
+- Respect the user's 12-hour or 24-hour system setting.
+
+**Date**
+- Immediately below the clock.
+- Smaller serif typography.
+- Example: `Mon, Nov 16`.
+- Automatically follow the user's locale and device date.
+
+**Favorite application rail**
+- Position: vertically aligned along the left edge.
+- Approximately 5–7 configurable shortcuts.
+- Icons arranged with consistent spacing.
+- Each icon should use the custom monochrome dot-inspired treatment.
+- No labels by default.
+- App selection must be customizable.
+- Support drag-and-drop reordering where practical.
+- Long-press opens a small contextual menu.
+
+**Bottom-right control**
+- A floating circular control.
+- Minimal white power-style symbol.
+- Subtle translucent background.
+- Soft shadow and restrained interaction feedback.
+- Tapping opens a configurable quick-actions panel.
+
+IMPORTANT: Do not pretend that an ordinary third-party Android application can directly power off the device. The control should offer supported quick actions such as opening Settings, wallpaper selection, launcher preferences, or search. Any additional device-management functionality must use appropriate Android APIs and explicit user authorization.
+
+---
+
+## B. APP DRAWER / APP LIBRARY
+
+The second and third screenshots demonstrate the main application library.
+
+This interface is particularly important because it defines the identity of the launcher.
+
+Do not replace it with a conventional application grid.
+
+### Visual characteristics
+
+- Same forest wallpaper as the home screen.
+- A translucent, soft grey overlay over the wallpaper.
+- Subtle frosted-glass appearance.
+- Application names arranged vertically.
+- Applications organized alphabetically.
+- Small monochromatic app icon containers.
+- Elegant serif/italic app-label typography.
+- Alphabetical index aligned vertically on the right edge.
+- Floating circular search control at the bottom-right corner.
+
+### Layout
+
+The application library should use a vertically scrolling alphabetical list.
+
+Example:
+
+A
+
+[icon] Assistant
+
+[icon] Authenticator
+
+[icon] Adobe Scan
+
+[icon] Albums
+
+[icon] Another App
+
+
+B
+
+[icon] Brave
+
+[icon] BitChord
+
+[icon] Bluetooth
+
+[icon] Banking App
+
+
+C
+
+[icon] Calendar
+
+[icon] Camera
+
+[icon] Chrome
+
+Continue through the alphabet.
+
+Use actual installed applications from Android. The examples above are only visual illustrations. Never hardcode an artificial application list.
+
+### Application rows
+
+Each row should contain:
+
+- A compact monochrome icon container.
+- The appropriate application icon.
+- Application name.
+- Consistent vertical alignment.
+- A generous enough touch area for comfortable interaction.
+
+Visual treatment:
+- Dark charcoal or near-black icon container.
+- Rounded-square shape.
+- Small white icon glyph.
+- Optional subtle accent for selected icons.
+- Application labels in a refined serif or serif-italic typeface.
+- Labels should be readable and truncate gracefully when necessary.
+
+Avoid oversized icons and unnecessary backgrounds around individual rows.
+
+The list should feel light, elegant, and almost editorial.
+
+### Alphabetical organization
+
+The application library must automatically:
+
+1. Retrieve installed launchable applications.
+2. Obtain their actual application names.
+3. Sort them alphabetically.
+4. Group them by their first alphabetical character.
+5. Display section headings.
+6. Handle applications beginning with numbers or special characters in a separate `#` group.
+7. Support different device locales.
+8. Update when applications are installed, removed, enabled, or changed.
+
+### Alphabet index
+
+Implement a slim vertical alphabet navigation rail on the right edge.
+
+Requirements:
+- A star/favorites entry at the top.
+- Letters A–Z.
+- Small and unobtrusive typography.
+- Vertically centered within the available screen area.
+- Semi-transparent appearance.
+- Active letter can receive a subtle highlight.
+- Tapping any letter should scroll directly to its corresponding section.
+- Support quick letter navigation without creating an oversized touch-blocking overlay.
+- Handle letters without matching applications gracefully.
+
+The alphabet rail should remain visually subordinate to the application list.
+
+### Search
+
+A floating circular search control should appear near the bottom-right corner.
+
+On tapping:
+- Transition into an elegant search state.
+- Display a translucent search field.
+- Bring up the Android keyboard.
+- Allow immediate application filtering.
+- Search should be case-insensitive.
+- Results must update as the user types.
+- Preserve the same visual language as the application library.
+- Provide a minimal empty-results state.
+- Include an easy way to clear and close the search.
+
+Search should be fast, including on devices with many installed applications.
+
+---
+
+# 3. DESIGN SYSTEM
+
+Create a cohesive visual language instead of styling every composable independently.
+
+## Overall aesthetic
+
+The core design language is:
+
+**Monochrome + Atmospheric + Minimalist + Frosted Glass + Editorial Typography.**
+
+Use a restrained neutral palette.
+
+Suggested colors:
+
+- Primary near-black: #0B0B0D
+- Deep charcoal: #171719
+- Secondary charcoal: #262629
+- Frosted grey: #A7A7A7
+- Mist grey: #D1D0CE
+- Off-white: #F1F0EE
+- Pure white: #FFFFFF
+
+These are starting values, not mandatory fixed colors. Tune transparency and contrast against the actual wallpaper.
+
+## Glassmorphism
+
+The glass effect should be subtle, realistic, and refined.
+
+Use:
+- Translucent neutral surfaces.
+- Background diffusion.
+- Very subtle white highlights.
+- Low-opacity borders.
+- Soft shadows.
+- Restrained corner radii.
+- Layered transparency.
+
+Avoid:
+- Excessively transparent surfaces that destroy readability.
+- Bright colored gradients.
+- Rainbow glass effects.
+- Neon borders.
+- Excessive reflections.
+- Strong shadows.
+- Overusing blur on every component.
+
+The application drawer should look as though a soft layer of frosted glass has been placed over the original wallpaper.
+
+IMPORTANT TECHNICAL DETAIL:
+
+A simple Compose `Modifier.blur()` blurs the composable's own rendered content; it does not automatically blur whatever is behind that composable.
+
+For the wallpaper diffusion effect, implement an appropriate wallpaper rendering pipeline. Prefer generating and caching a lower-resolution, pre-blurred wallpaper variant for the drawer, then layering translucent grey material over it.
+
+Keep the blur static rather than recomputing it every frame.
+
+Provide a graceful fallback on Android versions without the required graphics capabilities.
+
+## Dot-inspired icon design
+
+The application needs a distinctive icon language.
+
+Implement a consistent monochrome dot-inspired visual system.
+
+Desired characteristics:
+- Compact shapes.
+- Minimal white glyphs.
+- Carefully balanced negative space.
+- Small dot details where appropriate.
+- Rounded-square backgrounds.
+- Monochromatic appearance.
+- Consistent visual weight.
+- Subtle pressed-state feedback.
+
+Use Android's available monochrome adaptive icon layers where appropriate.
+
+When an application does not supply a suitable monochrome icon, provide a consistent fallback using its installed icon, with a grayscale treatment or a suitable local vector representation.
+
+Provide an option to switch between:
+1. Dot Mono — default monochromatic icon treatment.
+2. Original — original application icon colors.
+
+Do not generate arbitrary icons at runtime or display generic identical icons for every app.
+
+Keep the icon implementation modular so a compatible third-party icon-pack integration can be considered later without redesigning the launcher.
+
+## Typography
+
+Typography is one of the most important features.
+
+Use a combination of:
+
+**Serif typography**
+- Primary clock.
+- Date.
+- Application labels.
+- Section headings where appropriate.
+
+**Clean sans-serif typography**
+- Settings.
+- Search input.
+- Context menus.
+- Functional labels.
+- System-related information.
+
+The visual reference uses a distinctly editorial feeling.
+
+Prefer refined system serif fonts or a properly licensed bundled typeface.
+
+Keep font sizes, line heights, and weights consistent.
+
+Avoid excessive bold text.
+
+## Spacing and positioning
+
+Use a consistent spacing system based on 4dp increments.
+
+The interface must be responsive.
+
+Do not hardcode screenshot pixel positions or assume one particular screen resolution.
+
+Account for:
+- Different Android screen sizes.
+- Display density.
+- Status bar insets.
+- Gesture navigation insets.
+- Three-button navigation.
+- Landscape orientation where supported.
+- System font scaling.
+
+The app must preserve the composition across different devices.
+
+---
+
+# 4. CORE FUNCTIONAL REQUIREMENTS
+
+The following functionality is mandatory.
+
+## 4.1 Actual default Android launcher
+
+This must function as a real Android Home application.
+
+Requirements:
+- Correct HOME intent filter.
+- Ability to request the default Home role.
+- First-run onboarding explaining how to select the launcher.
+- Detect whether the application is currently the default launcher.
+- Provide a way to reopen the default Home selection flow.
+- Correct back/home navigation behavior.
+
+Do not create a normal application that simply imitates a launcher screen.
+
+## 4.2 Installed application discovery
+
+Retrieve real installed launcher activities through Android's supported package and launcher APIs.
+
+Display:
+- Application name.
+- Application icon.
+- Launchable activity/component.
+- Package identity for persistence.
+
+Implement:
+- Asynchronous application discovery.
+- Icon loading.
+- Icon caching.
+- Alphabetical sorting.
+- Search indexing.
+- Application refresh when package changes occur.
+
+Handle unavailable or unlaunchable applications without crashing.
+
+## 4.3 Application launching
+
+Tapping an application row or home shortcut should launch the corresponding application.
+
+Requirements:
+- Use the correct launch intent/component.
+- Prevent duplicate or invalid launch operations.
+- Gracefully handle applications that are no longer installed.
+- Return to the launcher naturally when the user presses Home.
+
+Do not simulate launching with a temporary UI.
+
+## 4.4 Favorites
+
+Support a favorites collection.
+
+Users should be able to:
+- Add applications to favorites.
+- Remove applications from favorites.
+- Reorder favorites.
+- Pin/unpin applications.
+- Access favorites from the home shortcut rail.
+- Navigate to favorites through the star entry in the alphabet index.
+
+Persist the selection between restarts.
+
+## 4.5 Search
+
+Implement real application search.
+
+Requirements:
+- Live filtering.
+- Application-name matching.
+- Case-insensitive matching.
+- Efficient filtering.
+- Clear button.
+- Empty state.
+- Keyboard handling.
+- Easy dismissal.
+- Correct handling of large application collections.
+
+## 4.6 Contextual application actions
+
+Long-pressing an application should reveal a small contextual interface.
+
+Possible actions:
+- Add/remove from favorites.
+- Add/remove from home shortcuts.
+- Application information.
+- Uninstall, where Android permits it.
+- Hide/show application in the launcher.
+- Other relevant supported actions.
+
+Use native Android settings or uninstall intents where appropriate.
+
+Avoid unnecessary custom dialogs.
+
+## 4.7 Wallpaper management
+
+Provide basic wallpaper customization.
+
+Users should be able to:
+- Choose a wallpaper from device storage.
+- Preview it.
+- Apply it.
+- Restore the default launcher wallpaper.
+- Adjust the wallpaper's darkening intensity.
+- Adjust drawer diffusion intensity.
+
+Persist the selected image URI using appropriate Android storage APIs and permissions.
+
+Process images efficiently:
+- Decode at an appropriate resolution.
+- Generate grayscale variants.
+- Generate drawer-blurred variants.
+- Cache processed wallpapers.
+- Release memory when they are no longer needed.
+
+Do not retain enormous full-resolution bitmaps unnecessarily.
+
+## 4.8 Clock and date
+
+The clock must use actual device time.
+
+Requirements:
+- 12-hour and 24-hour support.
+- Locale-aware date.
+- Correct timezone behavior.
+- Automatic updates.
+- No unnecessary high-frequency polling.
+
+Update only as frequently as required while the launcher is visible.
+
+## 4.9 Quick actions
+
+The lower-right home control should open a compact quick-actions panel.
+
+Suggested actions:
+- Search.
+- Settings.
+- Wallpaper.
+- Launcher customization.
+- Application library.
+
+Keep the interface minimal and visually consistent.
+
+Do not request privileged permissions merely to imitate device power controls.
+
+## 4.10 Launcher customization
+
+Create a simple preferences screen.
+
+Include the following configurable options:
+
+**Appearance**
+- Grayscale wallpaper.
+- Wallpaper darkening.
+- Drawer frosted intensity.
+- Icon appearance.
+- Icon size.
+- Typography style.
+- Clock visibility.
+- Date visibility.
+- App-label visibility.
+- Alphabet index visibility.
+
+**Home**
+- Add/remove shortcuts.
+- Reorder shortcuts.
+- Select favorite applications.
+- Configure the quick-action control.
+
+**Behavior**
+- Open drawer on upward swipe.
+- Search behavior.
+- Animation intensity.
+- Reduced-motion mode.
+- Haptic feedback toggle.
+
+Do not overwhelm the settings page with hundreds of options. Present controls in simple, well-organized sections.
+
+---
+
+# 5. INTERACTIONS AND ANIMATIONS
+
+The launcher must feel exceptionally smooth.
+
+Motion should be intentional, quiet, and natural.
+
+No excessive bounces, spring overshoots, spinning icons, or decorative continuous animations.
+
+### Required interactions
+
+**Home screen**
+- Swipe upward: open application library.
+- Tap favorite: launch application.
+- Long-press favorite: contextual actions.
+- Tap quick-actions control: open quick-actions panel.
+- Optional tap clock: open clock/date-related settings.
+
+**Application library**
+- Swipe vertically: browse applications.
+- Tap alphabet entry: jump to section.
+- Tap star: navigate to favorites.
+- Tap application: launch it.
+- Long-press application: contextual menu.
+- Tap search: enter search mode.
+- Android Back: close search or drawer appropriately.
+
+### Animation guidelines
+
+Suggested starting durations:
+
+| Interaction | Duration |
+|---|---:|
+| Home to drawer | 220–280 ms |
+| Drawer to home | 180–240 ms |
+| Search expansion | 180–220 ms |
+| Context menu | 140–180 ms |
+| Button press feedback | 90–140 ms |
+| Favorites updates | 160–200 ms |
+
+These values should be tuned on actual devices.
+
+Use:
+- Fade transitions.
+- Subtle vertical movement.
+- Small scale adjustments.
+- Natural easing.
+- Consistent motion curves.
+
+Animations should never block an interaction.
+
+Use lightweight animation primitives and avoid animating expensive wallpaper effects.
+
+Respect Android's reduced-motion and animation-scale settings wherever practical.
+
+---
+
+# 6. ANDROID TECHNICAL ARCHITECTURE
+
+Build this as a native Android application.
+
+## Preferred stack
+
+- Kotlin.
+- Jetpack Compose.
+- Material 3 as a foundation, with a completely customized visual system.
+- AndroidX libraries.
+- Kotlin Coroutines.
+- Kotlin Flow.
+- DataStore for persistent settings.
+- ViewModel for screen state.
+- PackageManager and LauncherApps APIs for installed applications.
+- Android system intents for launching and settings integration.
+
+Use current stable, compatible dependencies at implementation time.
+
+Do not blindly install large libraries for simple functionality.
+
+## Architecture
+
+Use a clean, maintainable architecture.
+
+Suggested structure:
+
+app/
+  src/main/
+    java/
+      launcher/
+        MainActivity.kt
+
+        core/
+          theme/
+          design/
+          graphics/
+          utils/
+
+        data/
+          apps/
+            AppRepository.kt
+            AppInfo.kt
+            AppIconCache.kt
+
+          preferences/
+            PreferencesRepository.kt
+
+          wallpaper/
+            WallpaperRepository.kt
+            WallpaperProcessor.kt
+
+        domain/
+          models/
+          usecases/
+
+        ui/
+          home/
+            HomeScreen.kt
+            HomeViewModel.kt
+
+          drawer/
+            AppDrawerScreen.kt
+            AppDrawerViewModel.kt
+
+          search/
+            SearchScreen.kt
+
+          favorites/
+            FavoritesManager.kt
+
+          settings/
+            SettingsScreen.kt
+
+          components/
+            AppIcon.kt
+            AppRow.kt
+            AlphabetRail.kt
+            GlassSurface.kt
+            ClockView.kt
+            FloatingActionButton.kt
+
+        platform/
+          launcher/
+          package/
+          navigation/
+          storage/
+
+  res/
+    drawable/
+    mipmap/
+    values/
+
+This is an organizational proposal, not a requirement to create unnecessary abstractions. Keep the implementation modular without overengineering it.
+
+### State management
+
+Use immutable UI state.
+
+Recommended pattern:
+
+- Repository handles installed applications and preferences.
+- ViewModel manages application state.
+- Kotlin Flow exposes observable data.
+- Compose renders state.
+- User interactions invoke explicit ViewModel actions.
+
+Avoid putting Android package-discovery logic directly inside composable functions.
+
+### Installed app discovery
+
+Use Android-supported launcher activity discovery.
+
+Query applications matching:
+- `Intent.ACTION_MAIN`
+- `Intent.CATEGORY_LAUNCHER`
+
+Use `LauncherApps` or the appropriate `PackageManager` APIs according to the Android version and feature requirements.
+
+Handle API-level differences through a dedicated platform layer.
+
+Do not use hardcoded application names, fake icons, or sample datasets in the production application.
+
+### Android package visibility
+
+Account for Android 11 and later package-visibility restrictions.
+
+Declare the minimum appropriate visibility requirements in the manifest using `<queries>` and the relevant launcher intent signature.
+
+Do not automatically request `QUERY_ALL_PACKAGES` without a demonstrated need and proper justification.
+
+The application must follow current Android and Google Play distribution policies.
+
+### Default launcher configuration
+
+Declare the appropriate HOME activity intent filter:
+
+- `android.intent.action.MAIN`
+- `android.intent.category.HOME`
+- `android.intent.category.DEFAULT`
+
+On Android 10 and later, use `RoleManager.ROLE_HOME` and its supported request flow when available.
+
+Provide an appropriate fallback flow for older versions.
+
+Verify the actual role state instead of assuming that the user granted it.
+
+### Application change monitoring
+
+The list must respond to:
+- Application installation.
+- Application removal.
+- Application replacement/update.
+- Application enable/disable changes.
+
+Use supported package-change or LauncherApps callback mechanisms.
+
+Avoid continuously polling PackageManager.
+
+### Persistent storage
+
+Persist:
+- Favorites.
+- Shortcut order.
+- Hidden applications.
+- Selected wallpaper URI.
+- User preferences.
+- Icon appearance.
+- Search/display settings.
+
+Use DataStore for simple persistent preferences.
+
+Keep temporary application icons and processed wallpaper variants in bounded caches.
+
+---
+
+# 7. PERFORMANCE AND RESOURCE EFFICIENCY
+
+This is a major product requirement.
+
+The launcher is expected to run as the primary Home application, potentially remaining visible or frequently resumed throughout the day.
+
+It must not waste battery, RAM, or GPU resources.
+
+### Performance goals
+
+Design for:
+- Fast initial home rendering.
+- Immediate access to favorites.
+- Responsive app-drawer opening.
+- Smooth alphabetical scrolling.
+- Instant search filtering.
+- Efficient icon retrieval.
+- Low idle CPU usage.
+- Minimal background activity.
+- Low memory overhead.
+
+Suggested engineering targets on representative mid-range Android devices:
+
+| Metric | Target |
+|---|---|
+| Warm home rendering | Under 150 ms |
+| Drawer transition | 60 FPS target |
+| Search response | Under 100 ms for ordinary app collections |
+| Idle CPU usage | As close to zero as practical |
+| Background services | None required for core functionality |
+| Unnecessary network activity | Zero |
+
+These are optimization targets to measure, not guaranteed results.
+
+### Mandatory optimization practices
+
+1. Use LazyColumn for the application library.
+2. Use stable keys for application rows.
+3. Avoid unnecessary Compose recompositions.
+4. Keep UI state reads as localized as possible.
+5. Cache application icons.
+6. Load and process wallpaper images away from the main thread.
+7. Reuse processed wallpaper variants.
+8. Avoid huge bitmap allocations.
+9. Avoid continuously redrawing static backgrounds.
+10. Avoid unnecessary infinite animations.
+11. Avoid periodic background polling.
+12. Release unused resources.
+13. Use efficient image rendering and clipping.
+14. Avoid excessive transparent layers and GPU overdraw.
+15. Keep startup work minimal.
+
+Provide a low-effects mode that reduces or removes expensive blur and transition effects on weaker devices.
+
+Use Android profiling and Compose performance tools to identify actual bottlenecks rather than optimizing based on assumptions.
+
+---
+
+# 8. ACCESSIBILITY AND DEVICE COMPATIBILITY
+
+Even though the visual design is minimal, the application must remain usable.
+
+Requirements:
+- TalkBack-compatible controls.
+- Meaningful content descriptions.
+- Adequate text contrast.
+- Minimum practical touch targets, ideally 48dp.
+- Proper keyboard behavior.
+- Responsive layout.
+- System font scaling.
+- Gesture navigation support.
+- Three-button navigation support.
+- Proper display cutout and inset handling.
+- Correct status bar icon contrast.
+- Graceful behavior on older Android versions.
+
+Do not hide the native status bar unnecessarily.
+
+Use edge-to-edge rendering with correct system-bar insets.
+
+Keep the HOME interface visually immersive without interfering with Android system navigation gestures.
+
+---
+
+# 9. SECURITY, PRIVACY AND PERMISSIONS
+
+The launcher should be privacy-first.
+
+Core functionality should operate locally.
+
+Do not introduce:
+- User accounts.
+- Remote application analytics.
+- Unnecessary internet connections.
+- Advertising SDKs.
+- Contact access.
+- Location access.
+- Microphone access.
+- Camera access.
+- Unnecessary background services.
+
+Request only the permissions strictly required for implemented features.
+
+For optional functionality, explain the reason before requesting permission.
+
+Wallpaper access should use the appropriate system document picker.
+
+Do not collect or upload the user's installed application list.
+
+---
+
+# 10. IMPLEMENTATION PHASES
+
+Implement the project in the following order.
+
+## Phase 1 — Project foundation
+
+- Inspect the existing repository.
+- Understand the current project structure.
+- Identify the build configuration and Android SDK.
+- Preserve functional existing code wherever possible.
+- Set up Kotlin and Compose architecture.
+- Establish theme and design tokens.
+- Configure the HOME activity.
+- Implement default-launcher onboarding.
+- Confirm the application compiles.
+
+Deliverable: a functioning Android application that can be selected as the default launcher.
+
+## Phase 2 — Home screen
+
+Implement:
+- Wallpaper rendering.
+- Grayscale treatment.
+- Clock.
+- Date.
+- Favorite shortcut rail.
+- Dot-inspired icons.
+- Bottom-right quick-action control.
+- Status and navigation bar integration.
+
+Deliverable: visually convincing, functional home screen matching the first reference.
+
+## Phase 3 — Application library
+
+Implement:
+- Real installed application discovery.
+- Icon retrieval.
+- Application-label retrieval.
+- Alphabetical sorting.
+- Alphabetical section grouping.
+- Vertical scrolling.
+- Right-side alphabet index.
+- Favorites navigation.
+- Application launching.
+
+Deliverable: functional application drawer matching the second and third references.
+
+## Phase 4 — Search and interactions
+
+Implement:
+- Search overlay.
+- Instant filtering.
+- Keyboard integration.
+- Contextual application actions.
+- Long-press behavior.
+- Home/drawer gestures.
+- Smooth transitions.
+
+Deliverable: a fully interactive launcher experience.
+
+## Phase 5 — Customization
+
+Implement:
+- Wallpaper selection.
+- Appearance controls.
+- Icon appearance selection.
+- Shortcut configuration.
+- Favorites management.
+- Preferences persistence.
+- Quick-actions configuration.
+
+Deliverable: personalized launcher settings.
+
+## Phase 6 — Optimization and validation
+
+- Profile application startup.
+- Inspect memory usage.
+- Verify bitmap caching.
+- Test application discovery.
+- Verify application installation/removal updates.
+- Inspect animation smoothness.
+- Test low-end and mid-range devices.
+- Test different display densities.
+- Verify navigation behavior.
+- Fix crashes and state-restoration issues.
+- Remove unnecessary dependencies and permissions.
+
+Deliverable: a stable, optimized release build.
+
+---
+
+# 11. DESIGN QUALITY EXPECTATIONS
+
+The most important priority is that the result should look professionally designed.
+
+Do not simply implement the requested features with default Material Design components.
+
+Pay particular attention to:
+
+- Exact typography hierarchy.
+- Clock positioning.
+- Vertical spacing.
+- Icon dimensions.
+- Application-label alignment.
+- Alphabet index positioning.
+- Wallpaper composition.
+- Fog and grayscale intensity.
+- Frosted overlay opacity.
+- Floating button design.
+- Animation quality.
+- Overall negative space.
+
+The home screen should feel calm and atmospheric.
+
+The drawer should feel like a beautiful, translucent extension of the home screen.
+
+Every screen should belong to the same design system.
+
+Do not add features simply because conventional launchers have them.
+
+The reference's simplicity is intentional.
+
+---
+
+# 12. TESTING AND ACCEPTANCE CRITERIA
+
+The project is not complete until all of the following are verified.
+
+### Core functionality
+- [ ] Application installs successfully.
+- [ ] Launcher appears in Android's Home application selection.
+- [ ] User can select it as default.
+- [ ] Pressing Home displays the custom home screen.
+- [ ] Home screen displays actual device time and date.
+- [ ] Favorite icons open real applications.
+- [ ] App drawer discovers actual installed launcher activities.
+- [ ] Applications are sorted and grouped alphabetically.
+- [ ] Alphabet navigation works.
+- [ ] Applications launch correctly.
+- [ ] Search filters applications immediately.
+- [ ] Search empty state works.
+- [ ] Favorites can be managed.
+- [ ] Long-press contextual actions work where supported.
+- [ ] Installed application changes refresh the library.
+- [ ] Wallpaper can be selected and persisted.
+- [ ] Preferences survive application restarts.
+- [ ] Back and Home behavior are correct.
+
+### Visual quality
+- [ ] Home screen resembles the supplied first reference.
+- [ ] Drawer resembles the supplied second and third references.
+- [ ] Both interfaces use the same wallpaper.
+- [ ] Grayscale rendering looks natural.
+- [ ] Drawer diffusion is attractive but readable.
+- [ ] Typography is refined and consistent.
+- [ ] Icons follow the same visual language.
+- [ ] Right-side alphabet navigation is unobtrusive.
+- [ ] Floating controls are visually consistent.
+- [ ] No unintended overlapping or clipping.
+- [ ] Layout adapts to different screen sizes.
+
+### Performance
+- [ ] No major frame drops during ordinary navigation.
+- [ ] App drawer scrolls smoothly.
+- [ ] Search remains responsive.
+- [ ] Wallpaper effects do not cause unnecessary continuous rendering.
+- [ ] No excessive background CPU usage.
+- [ ] No obvious memory leaks.
+- [ ] No unnecessary network requests.
+- [ ] No crashes when an application disappears during use.
+
+---
+
+# 13. EXPECTED CODING AGENT WORKFLOW
+
+You are responsible for implementing the actual software, not merely explaining how to implement it.
+
+Before changing code:
+
+1. Inspect the complete project repository.
+2. Understand the existing implementation, build system, and dependencies.
+3. Identify whether this is an existing project or an empty project.
+4. Create a concise implementation plan.
+5. Identify relevant Android version constraints.
+6. Verify any uncertain Android API behavior using current official documentation.
+
+Then start implementing.
+
+### Development rules
+
+- Write real, maintainable Kotlin code.
+- Use reusable Compose components.
+- Keep business logic outside composables.
+- Avoid giant single-file implementations.
+- Use meaningful naming.
+- Include appropriate error handling.
+- Do not leave major functionality as TODO comments.
+- Do not substitute placeholder applications for real package discovery.
+- Do not use static mock screenshots as the application interface.
+- Do not invent unsupported Android capabilities.
+- Do not add dependencies without a reason.
+- Do not overengineer simple functionality.
+- Run Gradle builds and relevant tests during implementation.
+- Fix compilation errors before declaring completion.
+- Validate the final application on an emulator or connected Android device wherever available.
+
+When an implementation detail is ambiguous, make a reasonable engineering decision that preserves the product vision rather than interrupting the implementation with unnecessary questions.
+
+### Final deliverables
+
+Provide:
+
+1. Complete working Android Studio project.
+2. All source files.
+3. Application manifest and configuration.
+4. Complete launcher implementation.
+5. Working application discovery and launching.
+6. Wallpaper and icon rendering implementation.
+7. Persistent settings.
+8. Required tests.
+9. README with setup and build instructions.
+10. Debug APK.
+11. Release APK, if signing configuration is available.
+12. Summary of implemented features.
+13. Known limitations and any functionality that remains incomplete.
+
+Include actual build results. Never claim that an APK or feature works unless it has been built and tested.
+
+---
+
+# 14. FINAL PRODUCT VISION
+
+The finished launcher should feel like a premium minimalist Android experience.
+
+Imagine unlocking the phone and seeing a quiet, fog-covered forest.
+
+The time is displayed in an elegant serif typeface.
+
+Your favorite applications sit quietly along the left edge as small monochromatic icons.
+
+Nothing else competes for your attention.
+
+Swipe upward.
+
+The forest remains visible, but a soft layer of translucent grey glass appears.
+
+Your applications are organized into beautiful alphabetical sections. The typography is refined. The icons are consistent. A subtle alphabet rail provides instant navigation. A floating search button makes finding anything effortless.
+
+Everything responds immediately.
+
+There is no unnecessary visual noise.
+
+There are no decorative animations running continuously.
+
+The launcher feels light, elegant, fast, and intentional.
+
+**The central objective: create one of the most visually beautiful, minimal, and resource-efficient Android launchers possible, with the exact atmospheric visual identity of the supplied references.**
+
+Prioritize exceptional execution of the core experience over adding more features.

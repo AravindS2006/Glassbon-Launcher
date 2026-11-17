@@ -1,0 +1,6 @@
+{
+  "name": "Glassbon",
+  "description": "Minimalist liquid frosted-glass Android launcher with curved alphabet navigation, monochrome squircle iconography, live media controls, and one-tap screen lock.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
