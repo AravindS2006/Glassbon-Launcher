@@ -217,7 +217,6 @@ fun LauncherRoot(
         },
         onScrubDragEnd = {
           isHomeRailScrubbing = false
-          viewModel.updateDrawerJumpTarget(null)
         },
         onLaunchApp = { viewModel.launchApp(it) },
         onLongPressApp = { viewModel.openContextMenu(it) },

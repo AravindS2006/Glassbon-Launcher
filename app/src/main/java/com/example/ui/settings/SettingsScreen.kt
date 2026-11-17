@@ -121,8 +121,8 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
           text = stringResource(R.string.settings_title),
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 28.sp,
+          fontFamily = FunctionalSansFontFamily,
+          fontSize = 24.sp,
           color = MistColors.OffWhite
         )
       }

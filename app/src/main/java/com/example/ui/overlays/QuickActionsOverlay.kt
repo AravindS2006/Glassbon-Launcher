@@ -97,8 +97,8 @@ fun QuickActionsOverlay(
       Column(modifier = Modifier.padding(vertical = 12.dp)) {
         Text(
           text = stringResource(R.string.quick_actions_title),
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 20.sp,
+          fontFamily = FunctionalSansFontFamily,
+          fontSize = 18.sp,
           color = MistColors.OffWhite,
           modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
         )
@@ -214,8 +214,8 @@ fun LockPermissionDialog(
           Spacer(modifier = Modifier.width(10.dp))
           Text(
             text = stringResource(R.string.lock_permission_title),
-            fontFamily = EditorialDisplayFontFamily,
-            fontSize = 20.sp,
+            fontFamily = FunctionalSansFontFamily,
+            fontSize = 18.sp,
             color = MistColors.OffWhite
           )
         }

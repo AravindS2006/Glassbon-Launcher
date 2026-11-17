@@ -135,7 +135,10 @@ fun HomeScreen(
       .windowInsetsPadding(WindowInsets.navigationBars)
       .padding(horizontal = 24.dp, vertical = 18.dp)
   ) {
-    // Structural Home Layout: Atmospheric Header (Clock + Date + Media) + Vertically Balanced Favorite Rail
+    val hasActiveMedia = uiState.activeMedia.hasSession
+    val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
+
+    // Structural Home Layout: Atmospheric Header (Clock + Date + optional Media) + Reclaimed Space for Favorite Rail
     Column(
       modifier = Modifier
         .fillMaxSize()
@@ -149,24 +152,26 @@ fun HomeScreen(
           translationY = -p * 40f
         }
     ) {
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(if (hasActiveMedia) 8.dp else 20.dp))
 
       ClockView(
         snapshot = clockSnapshot,
         showClock = prefs.showClock,
         showDate = prefs.showDate,
         isTopBright = uiState.wallpaper.isTopBright,
+        typographyStyle = prefs.typographyStyle,
+        isMediaActive = hasActiveMedia,
         onClockClick = onClockClick,
         onDateClick = onDateClick
       )
 
       AnimatedVisibility(
-        visible = uiState.activeMedia.hasSession,
+        visible = hasActiveMedia,
         enter = fadeIn() + expandVertically(),
         exit = fadeOut() + shrinkVertically()
       ) {
         Column {
-          Spacer(modifier = Modifier.height(16.dp))
+          Spacer(modifier = Modifier.height(14.dp))
           LiquidMediaCard(
             media = uiState.activeMedia,
             reducedMotion = prefs.reducedMotion,
@@ -178,20 +183,20 @@ fun HomeScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(if (uiState.activeMedia.hasSession) 18.dp else 26.dp))
+      Spacer(modifier = Modifier.height(if (hasActiveMedia) 16.dp else 26.dp))
 
-      // Balanced thumb-friendly favorite shortcuts container (scroll-safe on compact viewports)
+      // When no music is playing, favorites start cleanly in the reclaimed space directly below Clock & Day
       Box(
         modifier = Modifier
           .weight(1f)
           .fillMaxWidth(),
-        contentAlignment = Alignment.CenterStart
+        contentAlignment = Alignment.TopStart
       ) {
         Column(
           modifier = Modifier
             .verticalScroll(rememberScrollState())
             .testTag("home_favorites_rail"),
-          verticalArrangement = Arrangement.spacedBy(12.dp),
+          verticalArrangement = Arrangement.spacedBy(if (hasActiveMedia) 11.dp else 14.dp),
           horizontalAlignment = Alignment.Start
         ) {
           uiState.homeShortcutApps.forEach { app ->
@@ -275,6 +280,7 @@ fun HomeScreen(
           hapticEnabled = prefs.hapticFeedback,
           invisibleMode = prefs.homeAlphabetVisibility == HomeAlphabetVisibility.INVISIBLE_EDGE,
           reducedMotion = prefs.reducedMotion,
+          useSansBubble = useSans,
           onSelectKey = onScrubToDrawerSection,
           onDragEnd = onScrubDragEnd
         )

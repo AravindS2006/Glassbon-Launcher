@@ -178,23 +178,27 @@ fun AppDrawerScreen(
       listState.scrollToItem(index)
       triggerSectionSlide()
     }
-    if (!hideAlphabetRail) {
-      onJumpTargetHandled()
-    }
+    onJumpTargetHandled()
   }
 
   val activeIndexKey by remember(sectionIndexMap) {
     derivedStateOf {
-      val firstVisible = listState.firstVisibleItemIndex
-      var current: String? = null
-      for ((key, startIndex) in sectionIndexMap) {
-        if (startIndex <= firstVisible) {
-          current = key
-        } else {
-          break
+      val layoutInfo = listState.layoutInfo
+      val visibleItems = layoutInfo.visibleItemsInfo
+      if (visibleItems.isNotEmpty() && !listState.canScrollForward) {
+        sectionIndexMap.keys.lastOrNull()
+      } else {
+        val firstVisible = listState.firstVisibleItemIndex
+        var current: String? = null
+        for ((key, startIndex) in sectionIndexMap) {
+          if (startIndex <= firstVisible) {
+            current = key
+          } else {
+            break
+          }
         }
+        current ?: sectionIndexMap.keys.firstOrNull()
       }
-      current ?: sectionIndexMap.keys.firstOrNull()
     }
   }
 
@@ -328,6 +332,7 @@ fun AppDrawerScreen(
               item(key = "section_${section.header}", contentType = "header") {
                 DrawerSectionHeader(
                   title = section.header,
+                  useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
                   modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)
                 )
               }
@@ -362,6 +367,7 @@ fun AppDrawerScreen(
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 reducedMotion = prefs.reducedMotion,
+                useSansBubble = prefs.typographyStyle == TypographyStyle.CLEAN_SANS,
                 onDraggingChanged = { isRailDragging = it },
                 onSelectKey = { targetKey ->
                   val targetIndex = findNearestSectionIndex(targetKey, sectionIndexMap)
@@ -404,7 +410,10 @@ private fun findNearestSectionIndex(
     return sectionIndexMap.values.firstOrNull()
   }
   val keys = sectionIndexMap.keys.filter { it != FAVORITES_INDEX_KEY }
-  val exactOrNext = keys.firstOrNull { it >= targetKey && it != "#" }
+  if (targetKey == "#") {
+    return keys.lastOrNull()?.let { sectionIndexMap[it] }
+  }
+  val exactOrNext = keys.firstOrNull { it != "#" && it >= targetKey }
     ?: keys.lastOrNull()
   return exactOrNext?.let { sectionIndexMap[it] }
 }
@@ -412,12 +421,13 @@ private fun findNearestSectionIndex(
 @Composable
 private fun DrawerSectionHeader(
   title: String,
+  useSans: Boolean = true,
   modifier: Modifier = Modifier
 ) {
   Text(
     text = title,
-    fontFamily = EditorialDisplayFontFamily,
-    fontSize = 19.sp,
+    fontFamily = if (useSans) FunctionalSansFontFamily else EditorialDisplayFontFamily,
+    fontSize = if (useSans) 16.sp else 19.sp,
     letterSpacing = 0.6.sp,
     color = MistColors.OffWhite.copy(alpha = 0.72f),
     modifier = modifier.padding(start = 4.dp)
@@ -601,7 +611,11 @@ private fun SearchResultsList(
       Spacer(modifier = Modifier.height(12.dp))
       Text(
         text = stringResource(R.string.search_empty_title),
-        fontFamily = EditorialSerifFontFamily,
+        fontFamily = if (uiState.preferences.typographyStyle == TypographyStyle.CLEAN_SANS) {
+          FunctionalSansFontFamily
+        } else {
+          EditorialSerifFontFamily
+        },
         fontSize = 20.sp,
         color = MistColors.OffWhite.copy(alpha = 0.85f)
       )

@@ -17,9 +17,11 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.preferences.TypographyStyle
 import com.example.platform.ClockSnapshot
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
@@ -31,6 +33,8 @@ fun ClockView(
   showClock: Boolean,
   showDate: Boolean,
   isTopBright: Boolean,
+  typographyStyle: TypographyStyle = TypographyStyle.CLEAN_SANS,
+  isMediaActive: Boolean = false,
   onClockClick: () -> Unit,
   onDateClick: () -> Unit,
   modifier: Modifier = Modifier
@@ -57,16 +61,37 @@ fun ClockView(
     )
   }
 
+  val useSans = typographyStyle == TypographyStyle.CLEAN_SANS
+  val clockFontFamily = if (useSans) FunctionalSansFontFamily else EditorialDisplayFontFamily
+  val clockFontSize = when {
+    useSans && !isMediaActive -> 74.sp
+    useSans -> 64.sp
+    !isMediaActive -> 80.sp
+    else -> 70.sp
+  }
+  val clockLineHeight = when {
+    useSans && !isMediaActive -> 76.sp
+    useSans -> 66.sp
+    !isMediaActive -> 80.sp
+    else -> 70.sp
+  }
+
   Column(
     modifier = modifier.testTag("home_clock_area")
   ) {
     if (showClock) {
       Text(
         text = snapshot.formattedTime,
-        fontFamily = EditorialDisplayFontFamily,
-        fontSize = 74.sp,
-        lineHeight = 74.sp,
-        letterSpacing = (-1.4).sp,
+        fontFamily = clockFontFamily,
+        fontWeight = if (useSans) FontWeight.Medium else FontWeight.Normal,
+        fontStyle = if (!useSans && typographyStyle == TypographyStyle.SERIF_ITALIC) {
+          FontStyle.Italic
+        } else {
+          FontStyle.Normal
+        },
+        fontSize = clockFontSize,
+        lineHeight = clockLineHeight,
+        letterSpacing = if (useSans) (-2.2).sp else (-1.4).sp,
         color = primaryTextColor,
         style = TextStyle(shadow = subtleShadow),
         modifier = Modifier
@@ -86,13 +111,13 @@ fun ClockView(
         text = snapshot.formattedDate,
         fontFamily = FunctionalSansFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
+        fontSize = if (isMediaActive) 13.5.sp else 15.sp,
         lineHeight = 20.sp,
-        letterSpacing = 0.4.sp,
+        letterSpacing = 0.35.sp,
         color = secondaryTextColor,
         style = TextStyle(shadow = subtleShadow),
         modifier = Modifier
-          .padding(top = if (showClock) 2.dp else 0.dp)
+          .padding(top = if (showClock) 3.dp else 0.dp)
           .clip(RoundedCornerShape(8.dp))
           .clickable(
             interactionSource = remember { MutableInteractionSource() },

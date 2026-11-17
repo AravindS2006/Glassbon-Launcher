@@ -78,6 +78,12 @@ class AppRepository(
     }
   }
 
+  private val localeReceiver = object : BroadcastReceiver() {
+    override fun onReceive(ctx: Context?, intent: Intent?) {
+      refreshApps()
+    }
+  }
+
   private var registered = false
 
   fun startObserving() {
@@ -86,19 +92,22 @@ class AppRepository(
       runCatching {
         launcherApps?.registerCallback(launcherAppsCallback, Handler(Looper.getMainLooper()))
       }
-      val filter = IntentFilter().apply {
+      val packageFilter = IntentFilter().apply {
         addAction(Intent.ACTION_PACKAGE_ADDED)
         addAction(Intent.ACTION_PACKAGE_REMOVED)
         addAction(Intent.ACTION_PACKAGE_CHANGED)
         addAction(Intent.ACTION_PACKAGE_REPLACED)
-        addAction(Intent.ACTION_LOCALE_CHANGED)
         addDataScheme("package")
       }
+      val localeFilter = IntentFilter(Intent.ACTION_LOCALE_CHANGED)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        context.registerReceiver(packageReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        context.registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED)
+        context.registerReceiver(localeReceiver, localeFilter, Context.RECEIVER_NOT_EXPORTED)
       } else {
         @Suppress("UnspecifiedRegisterReceiverFlag")
-        context.registerReceiver(packageReceiver, filter)
+        context.registerReceiver(packageReceiver, packageFilter)
+        @Suppress("UnspecifiedRegisterReceiverFlag")
+        context.registerReceiver(localeReceiver, localeFilter)
       }
     }
     refreshApps()
@@ -109,6 +118,7 @@ class AppRepository(
     registered = false
     runCatching { launcherApps?.unregisterCallback(launcherAppsCallback) }
     runCatching { context.unregisterReceiver(packageReceiver) }
+    runCatching { context.unregisterReceiver(localeReceiver) }
   }
 
   fun refreshApps() {

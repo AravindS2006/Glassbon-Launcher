@@ -51,6 +51,9 @@ class MediaRepository(private val context: Context) {
   private var cachedTrackKey: String? = null
   private var cachedArtwork: ImageBitmap? = null
   private var artworkJob: Job? = null
+  private var pauseGraceJob: Job? = null
+  private var explicitPauseToken: Any? = null
+  private var explicitPauseExpiresAtMs: Long = 0L
 
   private val controllerCallback = object : MediaController.Callback() {
     override fun onPlaybackStateChanged(state: PlaybackState?) {
@@ -62,6 +65,7 @@ class MediaRepository(private val context: Context) {
     }
 
     override fun onSessionDestroyed() {
+      clearPauseGrace()
       refreshSessions()
     }
   }
@@ -93,6 +97,7 @@ class MediaRepository(private val context: Context) {
   fun stopObserving() {
     artworkJob?.cancel()
     artworkJob = null
+    clearPauseGrace()
     if (listening) {
       runCatching { sessionManager?.removeOnActiveSessionsChangedListener(sessionsListener) }
       listening = false
@@ -103,6 +108,7 @@ class MediaRepository(private val context: Context) {
   fun refreshSessions() {
     val granted = GlassbonMediaListenerService.isPermissionGranted(context)
     if (!granted) {
+      clearPauseGrace()
       detachController()
       _mediaState.value = ActiveMediaState(hasPermission = false)
       return
@@ -117,17 +123,32 @@ class MediaRepository(private val context: Context) {
     val controller = activeController ?: return
     val state = controller.playbackState?.state
     if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+      // Allow a brief grace window when user pauses directly from Glassbon so they can resume cleanly
+      val token = controller.sessionToken
+      explicitPauseToken = token
+      explicitPauseExpiresAtMs = android.os.SystemClock.elapsedRealtime() + 12_000L
+      pauseGraceJob?.cancel()
+      pauseGraceJob = scope.launch {
+        kotlinx.coroutines.delay(12_000L)
+        if (explicitPauseToken == token) {
+          clearPauseGrace()
+          refreshSessions()
+        }
+      }
       controller.transportControls.pause()
     } else {
+      clearPauseGrace()
       controller.transportControls.play()
     }
   }
 
   fun skipToNext() {
+    clearPauseGrace()
     activeController?.transportControls?.skipToNext()
   }
 
   fun skipToPrevious() {
+    clearPauseGrace()
     activeController?.transportControls?.skipToPrevious()
   }
 
@@ -145,13 +166,32 @@ class MediaRepository(private val context: Context) {
     }
   }
 
+  private fun clearPauseGrace() {
+    pauseGraceJob?.cancel()
+    pauseGraceJob = null
+    explicitPauseToken = null
+    explicitPauseExpiresAtMs = 0L
+  }
+
   private fun bindBestController(controllers: List<MediaController>) {
-    val best = controllers.firstOrNull {
+    val now = android.os.SystemClock.elapsedRealtime()
+    val playingController = controllers.firstOrNull {
       val st = it.playbackState?.state
-      st == PlaybackState.STATE_PLAYING || st == PlaybackState.STATE_BUFFERING
-    } ?: controllers.firstOrNull {
       val title = it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
-      !title.isNullOrBlank()
+      (st == PlaybackState.STATE_PLAYING || st == PlaybackState.STATE_BUFFERING) && !title.isNullOrBlank()
+    }
+
+    val best = playingController ?: controllers.firstOrNull {
+      val st = it.playbackState?.state
+      val title = it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+      st == PlaybackState.STATE_PAUSED &&
+        it.sessionToken == explicitPauseToken &&
+        now < explicitPauseExpiresAtMs &&
+        !title.isNullOrBlank()
+    }
+
+    if (playingController != null) {
+      clearPauseGrace()
     }
 
     if (best?.sessionToken != activeController?.sessionToken) {
@@ -181,7 +221,13 @@ class MediaRepository(private val context: Context) {
       ?: meta?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
       ?: "").trim()
 
-    if (title.isEmpty()) {
+    val pbState = controller.playbackState?.state
+    val isPlaying = pbState == PlaybackState.STATE_PLAYING || pbState == PlaybackState.STATE_BUFFERING
+    val inPauseGrace = pbState == PlaybackState.STATE_PAUSED &&
+      controller.sessionToken == explicitPauseToken &&
+      android.os.SystemClock.elapsedRealtime() < explicitPauseExpiresAtMs
+
+    if (title.isEmpty() || (!isPlaying && !inPauseGrace)) {
       artworkJob?.cancel()
       cachedTrackKey = null
       cachedArtwork = null
@@ -189,8 +235,9 @@ class MediaRepository(private val context: Context) {
       return
     }
 
-    val pbState = controller.playbackState?.state
-    val isPlaying = pbState == PlaybackState.STATE_PLAYING || pbState == PlaybackState.STATE_BUFFERING
+    if (isPlaying) {
+      clearPauseGrace()
+    }
     val trackKey = "$title|$artist|${controller.packageName}"
 
     // Reuse cached artwork when only play/pause state updates so UI stays 0ms latency

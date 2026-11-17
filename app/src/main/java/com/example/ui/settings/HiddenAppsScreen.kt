@@ -86,8 +86,12 @@ fun HiddenAppsScreen(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
           text = "Hidden Applications",
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 26.sp,
+          fontFamily = if (uiState.preferences.typographyStyle == com.example.data.preferences.TypographyStyle.CLEAN_SANS) {
+            FunctionalSansFontFamily
+          } else {
+            EditorialDisplayFontFamily
+          },
+          fontSize = 24.sp,
           color = MistColors.OffWhite
         )
       }
@@ -136,8 +140,12 @@ fun HiddenAppsScreen(
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
                   text = app.label,
-                  fontFamily = EditorialSerifFontFamily,
-                  fontSize = 16.sp,
+                  fontFamily = if (uiState.preferences.typographyStyle == com.example.data.preferences.TypographyStyle.CLEAN_SANS) {
+                    FunctionalSansFontFamily
+                  } else {
+                    EditorialSerifFontFamily
+                  },
+                  fontSize = 15.5.sp,
                   color = MistColors.OffWhite,
                   maxLines = 1,
                   overflow = TextOverflow.Ellipsis,

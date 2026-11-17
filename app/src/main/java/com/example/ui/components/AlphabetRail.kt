@@ -69,6 +69,7 @@ fun AlphabetRail(
   modifier: Modifier = Modifier,
   invisibleMode: Boolean = false,
   reducedMotion: Boolean = false,
+  useSansBubble: Boolean = true,
   onDraggingChanged: (Boolean) -> Unit = {},
   onDragEnd: () -> Unit = {}
 ) {
@@ -175,8 +176,9 @@ fun AlphabetRail(
       } else {
         Text(
           text = bubbleKey.orEmpty(),
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 29.sp,
+          fontFamily = if (useSansBubble) FunctionalSansFontFamily else EditorialDisplayFontFamily,
+          fontWeight = if (useSansBubble) FontWeight.SemiBold else FontWeight.Normal,
+          fontSize = if (useSansBubble) 26.sp else 29.sp,
           color = MistColors.PureWhite
         )
       }

@@ -23,39 +23,39 @@ val FunctionalSansFontFamily = FontFamily(
 
 val MistTypography = Typography(
   displayLarge = TextStyle(
-    fontFamily = EditorialDisplayFontFamily,
+    fontFamily = FunctionalSansFontFamily,
     fontWeight = FontWeight.Normal,
     fontSize = 72.sp,
     lineHeight = 74.sp,
-    letterSpacing = (-1.2).sp
+    letterSpacing = (-1.6).sp
   ),
   displayMedium = TextStyle(
-    fontFamily = EditorialDisplayFontFamily,
+    fontFamily = FunctionalSansFontFamily,
     fontWeight = FontWeight.Normal,
     fontSize = 46.sp,
     lineHeight = 50.sp,
-    letterSpacing = (-0.5).sp
+    letterSpacing = (-0.8).sp
   ),
   headlineMedium = TextStyle(
-    fontFamily = EditorialDisplayFontFamily,
-    fontWeight = FontWeight.Normal,
-    fontSize = 28.sp,
-    lineHeight = 34.sp,
-    letterSpacing = 0.sp
+    fontFamily = FunctionalSansFontFamily,
+    fontWeight = FontWeight.Medium,
+    fontSize = 26.sp,
+    lineHeight = 32.sp,
+    letterSpacing = (-0.2).sp
   ),
   headlineSmall = TextStyle(
-    fontFamily = EditorialSerifFontFamily,
-    fontWeight = FontWeight.Normal,
-    fontSize = 22.sp,
-    lineHeight = 28.sp,
-    letterSpacing = 0.1.sp
+    fontFamily = FunctionalSansFontFamily,
+    fontWeight = FontWeight.Medium,
+    fontSize = 21.sp,
+    lineHeight = 27.sp,
+    letterSpacing = 0.sp
   ),
   titleMedium = TextStyle(
-    fontFamily = EditorialSerifFontFamily,
-    fontWeight = FontWeight.Normal,
-    fontSize = 19.sp,
+    fontFamily = FunctionalSansFontFamily,
+    fontWeight = FontWeight.Medium,
+    fontSize = 18.sp,
     lineHeight = 24.sp,
-    letterSpacing = 0.15.sp
+    letterSpacing = 0.sp
   ),
   titleSmall = TextStyle(
     fontFamily = FunctionalSansFontFamily,

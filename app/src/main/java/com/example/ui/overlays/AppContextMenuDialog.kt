@@ -109,8 +109,8 @@ fun AppContextMenuDialog(
           Column(modifier = Modifier.weight(1f)) {
             Text(
               text = app.label,
-              fontFamily = EditorialSerifFontFamily,
-              fontSize = 18.sp,
+              fontFamily = FunctionalSansFontFamily,
+              fontSize = 16.sp,
               color = MistColors.OffWhite,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis

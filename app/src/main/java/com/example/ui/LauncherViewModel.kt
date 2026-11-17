@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -194,13 +195,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     appRepository.startObserving()
 
     viewModelScope.launch {
-      combine(appRepository.apps, preferencesRepository.preferences) { apps, prefs ->
-        apps to prefs
-      }.collect { (apps, prefs) ->
-        if (!prefs.favoritesSeeded && apps.isNotEmpty()) {
-          val seeded = pickInitialFavorites(apps, prefs.homeShortcutLimit)
-          preferencesRepository.updateFavorites(seeded, markSeeded = true)
-        }
+      val (apps, prefs) = combine(appRepository.apps, preferencesRepository.preferences) { a, p ->
+        a to p
+      }.first { (a, p) -> p.favoritesSeeded || a.isNotEmpty() }
+
+      if (!prefs.favoritesSeeded && apps.isNotEmpty()) {
+        val seeded = pickInitialFavorites(apps, prefs.homeShortcutLimit)
+        preferencesRepository.updateFavorites(seeded, markSeeded = true)
       }
     }
 

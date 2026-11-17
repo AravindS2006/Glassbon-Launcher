@@ -133,13 +133,13 @@ fun LiquidMediaCard(
 
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(18.dp),
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
           modifier = Modifier.fillMaxWidth()
         ) {
           IconButton(
             onClick = onPrevious,
             modifier = Modifier
-              .size(40.dp)
+              .size(48.dp)
               .testTag("media_prev_button")
           ) {
             Icon(
@@ -152,10 +152,8 @@ fun LiquidMediaCard(
 
           Box(
             modifier = Modifier
-              .size(42.dp)
+              .size(48.dp)
               .clip(CircleShape)
-              .background(Color(0x22FFFFFF))
-              .border(1.dp, MistColors.PureWhite.copy(alpha = 0.78f), CircleShape)
               .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = MistColors.PureWhite),
@@ -164,18 +162,27 @@ fun LiquidMediaCard(
               .testTag("media_play_pause_button"),
             contentAlignment = Alignment.Center
           ) {
-            Icon(
-              imageVector = if (media.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-              contentDescription = stringResource(R.string.cd_media_play_pause),
-              tint = MistColors.PureWhite,
-              modifier = Modifier.size(22.dp)
-            )
+            Box(
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color(0x22FFFFFF))
+                .border(1.dp, MistColors.PureWhite.copy(alpha = 0.78f), CircleShape),
+              contentAlignment = Alignment.Center
+            ) {
+              Icon(
+                imageVector = if (media.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(R.string.cd_media_play_pause),
+                tint = MistColors.PureWhite,
+                modifier = Modifier.size(22.dp)
+              )
+            }
           }
 
           IconButton(
             onClick = onNext,
             modifier = Modifier
-              .size(40.dp)
+              .size(48.dp)
               .testTag("media_next_button")
           ) {
             Icon(

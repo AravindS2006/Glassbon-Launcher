@@ -107,8 +107,8 @@ fun WallpaperStudioScreen(
           }
           Text(
             text = stringResource(R.string.wallpaper_title),
-            fontFamily = EditorialDisplayFontFamily,
-            fontSize = 24.sp,
+            fontFamily = FunctionalSansFontFamily,
+            fontSize = 22.sp,
             color = MistColors.OffWhite
           )
         }

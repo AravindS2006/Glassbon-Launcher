@@ -107,8 +107,12 @@ fun FavoritesManagerScreen(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
           text = stringResource(R.string.favorites_title),
-          fontFamily = EditorialDisplayFontFamily,
-          fontSize = 26.sp,
+          fontFamily = if (prefs.typographyStyle == com.example.data.preferences.TypographyStyle.CLEAN_SANS) {
+            FunctionalSansFontFamily
+          } else {
+            EditorialDisplayFontFamily
+          },
+          fontSize = 24.sp,
           color = MistColors.OffWhite
         )
       }
@@ -171,8 +175,12 @@ fun FavoritesManagerScreen(
                 Column(modifier = Modifier.weight(1f)) {
                   Text(
                     text = app.label,
-                    fontFamily = EditorialSerifFontFamily,
-                    fontSize = 16.sp,
+                    fontFamily = if (prefs.typographyStyle == com.example.data.preferences.TypographyStyle.CLEAN_SANS) {
+                      FunctionalSansFontFamily
+                    } else {
+                      EditorialSerifFontFamily
+                    },
+                    fontSize = 15.5.sp,
                     color = MistColors.OffWhite,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -259,8 +267,12 @@ fun FavoritesManagerScreen(
             Spacer(modifier = Modifier.width(14.dp))
             Text(
               text = app.label,
-              fontFamily = EditorialSerifFontFamily,
-              fontSize = 16.sp,
+              fontFamily = if (prefs.typographyStyle == com.example.data.preferences.TypographyStyle.CLEAN_SANS) {
+                FunctionalSansFontFamily
+              } else {
+                EditorialSerifFontFamily
+              },
+              fontSize = 15.5.sp,
               color = MistColors.OffWhite,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
