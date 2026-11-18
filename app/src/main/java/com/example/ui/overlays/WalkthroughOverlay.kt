@@ -62,6 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
@@ -129,9 +131,9 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "One-Tap Lock & Quick Actions",
-    description = "Tap the floating power button to turn off & lock your screen via a 100ms timeout (auto-restoring yours)—or press and hold anytime for Quick Actions.",
-    tip = "Wallpaper Studio, Favorites, Preferences, and this Tour live cleanly inside Quick Actions.",
+    title = "Lock Screen App & Quick Actions",
+    description = "Tap the bottom-right glass button to launch your linked Android Lock Screen app with sculpted haptic feedback—or press and hold anytime for Quick Actions.",
+    tip = "Auto-detects your Lock Screen app or lets you pick any lock utility inside Preferences.",
     icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
@@ -145,6 +147,7 @@ fun WalkthroughOverlay(
   onFinish: () -> Unit
 ) {
   BackHandler(onBack = onFinish)
+  val haptics = LocalMistHaptics.current
 
   val pagerState = rememberPagerState(
     initialPage = currentStep.coerceIn(0, WALKTHROUGH_STEPS.lastIndex),
@@ -240,7 +243,10 @@ fun WalkthroughOverlay(
           }
 
           TextButton(
-            onClick = onFinish,
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onFinish()
+            },
             modifier = Modifier
               .heightIn(min = 40.dp)
               .testTag("walkthrough_skip_button")
@@ -378,6 +384,7 @@ fun WalkthroughOverlay(
           if (pagerState.currentPage > 0) {
             TextButton(
               onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
                 val target = (pagerState.currentPage - 1).coerceAtLeast(0)
                 scope.launch {
                   if (reducedMotion) pagerState.scrollToPage(target)
@@ -410,8 +417,10 @@ fun WalkthroughOverlay(
           Button(
             onClick = {
               if (isLastStep) {
+                haptics.trigger(MistHapticEvent.CONFIRM)
                 onFinish()
               } else {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
                 val target = (pagerState.currentPage + 1).coerceAtMost(WALKTHROUGH_STEPS.lastIndex)
                 scope.launch {
                   if (reducedMotion) pagerState.scrollToPage(target)

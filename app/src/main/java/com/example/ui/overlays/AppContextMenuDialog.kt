@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.apps.AppInfo
 import com.example.data.preferences.IconStyle
 import com.example.ui.components.MistAppIcon
@@ -261,6 +263,7 @@ private fun ContextActionRow(
   testTag: String,
   onClick: () -> Unit
 ) {
+  val haptics = LocalMistHaptics.current
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
@@ -270,7 +273,10 @@ private fun ContextActionRow(
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
-        onClick = onClick
+        onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onClick()
+        }
       )
       .padding(horizontal = 18.dp, vertical = 10.dp)
       .testTag(testTag)

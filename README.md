@@ -52,9 +52,10 @@
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
 - **Smart Audio Media Capsule**
   - Automatically expands beneath Clock/Date using zero-permission `AudioManager` hardware media key events (`KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` / `PREVIOUS`) while audio plays, then collapses cleanly when idle.
-- **One-Tap Lock Screen (100ms Timeout), Quick Actions & Play-Protect-Safe Permissions**
-  - Tap the bottom-right glass power/lock button to **Lock Screen** by briefly setting Android's display timeout to `100ms` (`WRITE_SETTINGS`) and immediately restoring your normal timeout when the screen turns off—avoiding `BIND_ACCESSIBILITY_SERVICE` completely. Press and hold for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), **Screen Lock Settings**, and the **Guided Feature Tour**.
-  - Zero `INTERNET`, `BIND_ACCESSIBILITY_SERVICE`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`, `REQUEST_DELETE_PACKAGES`, SMS, or broad storage permissions.
+- **Linked Lock Screen App, Sculpted Haptics & Zero Manifest Permissions**
+  - Tap the bottom-right glass lock button to launch your **linked Android Lock Screen app** (auto-detects OEM or Play Store lock screen / screen-off utilities, or lets you link any app once via a frosted searchable picker and change it anytime in **Preferences → Linked Lock Screen App**). Press and hold for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), **Screen Lock Settings**, and the **Guided Feature Tour**.
+  - **Sculpted Tactile Haptics (`MistHaptics`)**: Zero-permission `HapticFeedbackConstants` cues with **Subtle**, **Balanced**, and **Crisp** profiles across curved wave detents, drawer swipe-down return, context pop-ups, and app launches.
+  - Ships with **zero `<uses-permission>` declarations** — no `WRITE_SETTINGS`, `INTERNET`, `VIBRATE`, `BIND_ACCESSIBILITY_SERVICE`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`, `REQUEST_DELETE_PACKAGES`, SMS, or broad storage permissions.
 
 ---
 
@@ -83,7 +84,7 @@ Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOv
 3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
 4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
 5. **Smart Audio Media Capsule** — Space-reclaiming zero-permission playback card.
-6. **One-Tap Lock & Quick Actions** — Bottom-right control that sleeps & locks the screen via auto-restored `100ms` timeout, or opens Quick Actions on hold.
+6. **Lock Screen App & Quick Actions** — Bottom-right control that launches your linked Android Lock Screen app with sculpted haptic feedback, or opens Quick Actions on hold.
 
 Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
 
@@ -105,7 +106,7 @@ gradle :app:testDebugUnitTest --no-daemon
 
 This repository includes `.github/workflows/android-release.yml`:
 - **Push / Pull Request to `main`**: Runs `:app:testDebugUnitTest` and uploads `Glassbon-debug-apk` as a workflow artifact.
-- **Version Tag (`v*`) or Manual Dispatch**: Automatically builds the APK and publishes a GitHub Release with the APK attached.
+- **Version Tag (`v*`) or Manual Dispatch**: Dynamically derives both `versionName` and `versionCode` from the pushed Git/GitHub release tag (e.g. `v1.2.3` → `1.2.3`, `versionCode = 10203`), builds the APK, and publishes a GitHub Release with the APK attached.
 
 ```bash
 git tag v1.0.0

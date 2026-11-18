@@ -38,6 +38,24 @@ enum class PerformanceProfile(val displayName: String) {
   POWER_SAVER("Low Power")
 }
 
+enum class HapticProfile(val displayName: String) {
+  SUBTLE("Subtle"),
+  BALANCED("Balanced"),
+  CRISP("Crisp")
+}
+
+enum class AlphabetFocusBlur(
+  val displayName: String,
+  val blurRadiusDp: Float,
+  val dimAlpha: Float,
+  val scaleFactor: Float
+) {
+  OFF("Off", 0f, 1f, 1f),
+  SOFT("Soft Mist", 5f, 0.50f, 0.98f),
+  FROSTED("Frosted Lens", 11f, 0.30f, 0.955f),
+  DEEP("Deep Bokeh", 18f, 0.18f, 0.935f)
+}
+
 @Immutable
 data class LauncherPreferences(
   val favoriteKeys: List<String> = emptyList(),
@@ -55,6 +73,7 @@ data class LauncherPreferences(
   val showHomeLabels: Boolean = false,
   val showAlphabetIndex: Boolean = true,
   val showLeftHiddenAlphabet: Boolean = true,
+  val alphabetFocusBlur: AlphabetFocusBlur = AlphabetFocusBlur.FROSTED,
   val homeAlphabetVisibility: HomeAlphabetVisibility = HomeAlphabetVisibility.VISIBLE,
   val swipeUpOpensDrawer: Boolean = false,
   val searchAutoFocusKeyboard: Boolean = true,
@@ -62,7 +81,9 @@ data class LauncherPreferences(
   val reducedMotion: Boolean = false,
   val lowEffectsMode: Boolean = false,
   val hapticFeedback: Boolean = true,
+  val hapticProfile: HapticProfile = HapticProfile.BALANCED,
   val quickActionMode: QuickActionMode = QuickActionMode.LOCK_SCREEN,
+  val lockAppComponentKey: String? = null,
   val onboardingDismissed: Boolean = false,
   val walkthroughCompleted: Boolean = false,
   val favoritesSeeded: Boolean = false

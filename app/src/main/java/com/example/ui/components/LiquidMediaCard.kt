@@ -57,6 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.media.ActiveMediaState
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
@@ -73,6 +75,7 @@ fun LiquidMediaCard(
   modifier: Modifier = Modifier
 ) {
   val cardShape = remember { RoundedCornerShape(22.dp) }
+  val haptics = LocalMistHaptics.current
 
   Box(
     modifier = modifier
@@ -84,7 +87,10 @@ fun LiquidMediaCard(
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
-        onClick = onOpenPlayer
+        onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onOpenPlayer()
+        }
       )
       .padding(horizontal = 14.dp, vertical = 12.dp)
       .testTag("home_media_card")
@@ -137,7 +143,10 @@ fun LiquidMediaCard(
           modifier = Modifier.fillMaxWidth()
         ) {
           IconButton(
-            onClick = onPrevious,
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onPrevious()
+            },
             modifier = Modifier
               .size(48.dp)
               .testTag("media_prev_button")
@@ -157,7 +166,10 @@ fun LiquidMediaCard(
               .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = MistColors.PureWhite),
-                onClick = onPlayPause
+                onClick = {
+                  haptics.trigger(MistHapticEvent.CONFIRM)
+                  onPlayPause()
+                }
               )
               .testTag("media_play_pause_button"),
             contentAlignment = Alignment.Center
@@ -180,7 +192,10 @@ fun LiquidMediaCard(
           }
 
           IconButton(
-            onClick = onNext,
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onNext()
+            },
             modifier = Modifier
               .size(48.dp)
               .testTag("media_next_button")

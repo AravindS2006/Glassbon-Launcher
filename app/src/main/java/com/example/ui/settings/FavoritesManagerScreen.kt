@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.apps.AppInfo
 import com.example.ui.LauncherUiState
 import com.example.ui.components.GlassSurface
@@ -67,6 +69,7 @@ fun FavoritesManagerScreen(
 ) {
   BackHandler(onBack = onClose)
   val prefs = uiState.preferences
+  val haptics = LocalMistHaptics.current
   val favoriteSet = remember(uiState.favoriteApps) {
     uiState.favoriteApps.map { it.componentKey }.toSet()
   }
@@ -95,7 +98,10 @@ fun FavoritesManagerScreen(
           .padding(horizontal = 12.dp, vertical = 10.dp)
       ) {
         IconButton(
-          onClick = onClose,
+          onClick = {
+            haptics.trigger(MistHapticEvent.TAP_LIGHT)
+            onClose()
+          },
           modifier = Modifier.testTag("favorites_back_button")
         ) {
           Icon(
@@ -195,7 +201,10 @@ fun FavoritesManagerScreen(
                 }
 
                 IconButton(
-                  onClick = { onMoveFavorite(app.componentKey, -1) },
+                  onClick = {
+                    haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                    onMoveFavorite(app.componentKey, -1)
+                  },
                   enabled = index > 0
                 ) {
                   Icon(
@@ -207,7 +216,10 @@ fun FavoritesManagerScreen(
                 }
 
                 IconButton(
-                  onClick = { onMoveFavorite(app.componentKey, 1) },
+                  onClick = {
+                    haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                    onMoveFavorite(app.componentKey, 1)
+                  },
                   enabled = index < uiState.favoriteApps.lastIndex
                 ) {
                   Icon(
@@ -222,7 +234,10 @@ fun FavoritesManagerScreen(
                   )
                 }
 
-                IconButton(onClick = { onToggleFavorite(app) }) {
+                IconButton(onClick = {
+                  haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                  onToggleFavorite(app)
+                }) {
                   Icon(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = stringResource(R.string.action_remove_favorite),
@@ -256,7 +271,10 @@ fun FavoritesManagerScreen(
             modifier = Modifier
               .fillMaxWidth()
               .heightIn(min = 52.dp)
-              .clickable { onToggleFavorite(app) }
+              .clickable {
+                haptics.trigger(MistHapticEvent.CONFIRM)
+                onToggleFavorite(app)
+              }
               .padding(horizontal = 8.dp, vertical = 6.dp)
           ) {
             MistAppIcon(

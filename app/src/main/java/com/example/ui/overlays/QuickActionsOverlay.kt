@@ -55,6 +55,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.ui.components.GlassSurface
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
@@ -62,7 +64,7 @@ import com.example.ui.theme.MistColors
 @Composable
 fun QuickActionsOverlay(
   isDefaultLauncher: Boolean,
-  isScreenLockEnabled: Boolean = false,
+  linkedLockAppLabel: String? = null,
   reducedMotion: Boolean = false,
   onLockScreen: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
@@ -139,7 +141,7 @@ fun QuickActionsOverlay(
         QuickActionRow(
           icon = Icons.Rounded.PowerSettingsNew,
           label = stringResource(R.string.action_lock_screen),
-          badge = if (isScreenLockEnabled) "Ready" else "Setup",
+          badge = linkedLockAppLabel ?: "Link App",
           testTag = "qa_lock_screen",
           onClick = onLockScreen
         )
@@ -217,6 +219,7 @@ private fun QuickActionRow(
   onClick: () -> Unit,
   badge: String? = null
 ) {
+  val haptics = LocalMistHaptics.current
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.Start,
@@ -227,7 +230,10 @@ private fun QuickActionRow(
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
-        onClick = onClick
+        onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onClick()
+        }
       )
       .padding(horizontal = 18.dp, vertical = 10.dp)
       .testTag(testTag)

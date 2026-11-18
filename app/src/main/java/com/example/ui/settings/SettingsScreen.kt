@@ -4,11 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,7 +47,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
+import com.example.data.preferences.AlphabetFocusBlur
+import com.example.data.preferences.HapticProfile
 import com.example.data.preferences.HomeAlphabetVisibility
 import com.example.data.preferences.IconSize
 import com.example.data.preferences.IconStyle
@@ -55,7 +61,6 @@ import com.example.data.preferences.QuickActionMode
 import com.example.data.preferences.TypographyStyle
 import com.example.ui.LauncherUiState
 import com.example.ui.components.GlassSurface
-import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 
@@ -71,6 +76,7 @@ fun SettingsScreen(
   onSetShowHomeLabels: (Boolean) -> Unit,
   onSetShowAlphabetIndex: (Boolean) -> Unit,
   onSetShowLeftHiddenAlphabet: (Boolean) -> Unit,
+  onSetAlphabetFocusBlur: (AlphabetFocusBlur) -> Unit,
   onSetHomeAlphabetVisibility: (HomeAlphabetVisibility) -> Unit,
   onSetHomeShortcutLimit: (Int) -> Unit,
   onSetQuickActionMode: (QuickActionMode) -> Unit,
@@ -79,10 +85,11 @@ fun SettingsScreen(
   onSetReducedMotion: (Boolean) -> Unit,
   onSetLowEffectsMode: (Boolean) -> Unit,
   onSetHapticFeedback: (Boolean) -> Unit,
+  onSetHapticProfile: (HapticProfile) -> Unit,
   onOpenWallpaperStudio: () -> Unit,
   onOpenFavoritesManager: () -> Unit,
   onOpenHiddenApps: () -> Unit,
-  onOpenWriteSettingsLockSetup: () -> Unit,
+  onOpenLockAppPicker: () -> Unit,
   onOpenLockScreenSettings: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartWalkthrough: () -> Unit,
@@ -90,6 +97,7 @@ fun SettingsScreen(
 ) {
   BackHandler(onBack = onClose)
   val prefs = uiState.preferences
+  val haptics = LocalMistHaptics.current
 
   Box(
     modifier = Modifier
@@ -113,7 +121,10 @@ fun SettingsScreen(
           .padding(horizontal = 12.dp, vertical = 10.dp)
       ) {
         IconButton(
-          onClick = onClose,
+          onClick = {
+            haptics.trigger(MistHapticEvent.TAP_LIGHT)
+            onClose()
+          },
           modifier = Modifier.testTag("settings_back_button")
         ) {
           Icon(
@@ -227,6 +238,21 @@ fun SettingsScreen(
             checked = prefs.showAlphabetIndex,
             onCheckedChange = onSetShowAlphabetIndex
           )
+          DividerLine()
+          SegmentedPreferenceRow(
+            title = "Alphabet Focus Blur",
+            subtitle = when (prefs.alphabetFocusBlur) {
+              AlphabetFocusBlur.OFF -> "All drawer alphabets remain crisp while jumping"
+              AlphabetFocusBlur.SOFT -> "Gentle optical mist around non-selected alphabets"
+              AlphabetFocusBlur.FROSTED -> "Frosted lens blur fades other alphabets while centering"
+              AlphabetFocusBlur.DEEP -> "Deep camera bokeh isolates the centered alphabet"
+            },
+            options = AlphabetFocusBlur.entries,
+            selected = prefs.alphabetFocusBlur,
+            label = { it.displayName },
+            optionTestTag = { "focus_blur_${it.name.lowercase()}" },
+            onSelect = onSetAlphabetFocusBlur
+          )
         }
 
         // HOME
@@ -286,22 +312,40 @@ fun SettingsScreen(
           DividerLine()
           TogglePreferenceRow(
             title = "Haptic Feedback",
+            subtitle = "Zero-permission tactile detents across waves & actions",
             checked = prefs.hapticFeedback,
             onCheckedChange = onSetHapticFeedback
           )
+          if (prefs.hapticFeedback) {
+            DividerLine()
+            SegmentedPreferenceRow(
+              title = "Haptic Feel",
+              subtitle = when (prefs.hapticProfile) {
+                HapticProfile.SUBTLE -> "Minimal whisper ticks along the alphabet wave & confirms"
+                HapticProfile.BALANCED -> "Sculpted glass clicks, rhythmic letter ticks & crisp confirms"
+                HapticProfile.CRISP -> "Articulated mechanical clicks across every tap & control"
+              },
+              options = HapticProfile.entries,
+              selected = prefs.hapticProfile,
+              label = { it.displayName },
+              optionTestTag = { "haptic_profile_${it.name.lowercase()}" },
+              onSelect = { profile ->
+                haptics.preview(profile)
+                onSetHapticProfile(profile)
+              }
+            )
+          }
         }
 
         // SYSTEM INTEGRATION
         SectionBlock(title = "System Integration") {
           NavigationPreferenceRow(
-            title = "One-Tap Screen Lock",
-            subtitle = if (uiState.isScreenLockEnabled) {
-              "Enabled — Uses 100ms screen timeout & auto-restores yours"
-            } else {
-              "Tap to allow Modify System Settings (Play-Protect safe)"
-            },
-            testTag = "settings_write_settings_lock_row",
-            onClick = onOpenWriteSettingsLockSetup
+            title = "Linked Lock Screen App",
+            subtitle = uiState.linkedLockApp?.let {
+              "Linked to ${it.label} — launched on bottom-right Lock tap"
+            } ?: "Not linked — tap to connect your Android Lock Screen app",
+            testTag = "settings_lock_app_row",
+            onClick = onOpenLockAppPicker
           )
           DividerLine()
           NavigationPreferenceRow(
@@ -320,13 +364,34 @@ fun SettingsScreen(
         }
 
         // HELP & WALKTHROUGH
-        SectionBlock(title = "Guide") {
+        SectionBlock(title = "Guide & Version") {
           NavigationPreferenceRow(
             title = "Interactive Feature Tour",
             subtitle = "Walk through gestures, curved alphabet wave & previews",
             testTag = "settings_walkthrough_row",
             onClick = onStartWalkthrough
           )
+          DividerLine()
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 14.dp)
+              .testTag("settings_version_info")
+          ) {
+            Text(
+              text = "Glassbon v${BuildConfig.VERSION_NAME}",
+              fontFamily = FunctionalSansFontFamily,
+              fontSize = 14.5.sp,
+              color = MistColors.OffWhite
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+              text = "Build ${BuildConfig.VERSION_CODE} · Zero manifest permissions",
+              fontFamily = FunctionalSansFontFamily,
+              fontSize = 12.sp,
+              color = MistColors.FrostedGrey
+            )
+          }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -375,6 +440,7 @@ private fun TogglePreferenceRow(
   onCheckedChange: (Boolean) -> Unit,
   subtitle: String? = null
 ) {
+  val haptics = LocalMistHaptics.current
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
@@ -383,7 +449,10 @@ private fun TogglePreferenceRow(
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
-        onClick = { onCheckedChange(!checked) }
+        onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onCheckedChange(!checked)
+        }
       )
       .padding(horizontal = 16.dp, vertical = 10.dp)
   ) {
@@ -406,7 +475,10 @@ private fun TogglePreferenceRow(
     Spacer(modifier = Modifier.width(12.dp))
     Switch(
       checked = checked,
-      onCheckedChange = onCheckedChange,
+      onCheckedChange = {
+        haptics.trigger(MistHapticEvent.TAP_LIGHT)
+        onCheckedChange(it)
+      },
       colors = SwitchDefaults.colors(
         checkedThumbColor = MistColors.NearBlack,
         checkedTrackColor = MistColors.OffWhite,
@@ -425,6 +497,7 @@ private fun NavigationPreferenceRow(
   testTag: String,
   onClick: () -> Unit
 ) {
+  val haptics = LocalMistHaptics.current
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
@@ -433,7 +506,10 @@ private fun NavigationPreferenceRow(
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
-        onClick = onClick
+        onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onClick()
+        }
       )
       .padding(horizontal = 16.dp, vertical = 12.dp)
       .testTag(testTag)
@@ -461,6 +537,7 @@ private fun NavigationPreferenceRow(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> SegmentedPreferenceRow(
   title: String,
@@ -471,6 +548,7 @@ private fun <T> SegmentedPreferenceRow(
   subtitle: String? = null,
   optionTestTag: ((T) -> String)? = null
 ) {
+  val haptics = LocalMistHaptics.current
   Column(
     modifier = Modifier
       .fillMaxWidth()
@@ -492,11 +570,10 @@ private fun <T> SegmentedPreferenceRow(
       )
     }
     Spacer(modifier = Modifier.height(10.dp))
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .horizontalScroll(rememberScrollState()),
-      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    FlowRow(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
       options.forEach { option ->
         val isSelected = option == selected
@@ -518,7 +595,10 @@ private fun <T> SegmentedPreferenceRow(
             .clickable(
               interactionSource = remember { MutableInteractionSource() },
               indication = ripple(bounded = true),
-              onClick = { onSelect(option) }
+              onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                onSelect(option)
+              }
             )
             .padding(horizontal = 14.dp, vertical = 8.dp),
           contentAlignment = Alignment.Center

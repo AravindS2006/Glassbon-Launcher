@@ -35,6 +35,7 @@ class PreferencesRepository(private val context: Context) {
     val SHOW_HOME_LABELS = booleanPreferencesKey("show_home_labels")
     val SHOW_ALPHABET_INDEX = booleanPreferencesKey("show_alphabet_index")
     val SHOW_LEFT_HIDDEN_ALPHABET = booleanPreferencesKey("show_left_hidden_alphabet")
+    val ALPHABET_FOCUS_BLUR = stringPreferencesKey("alphabet_focus_blur")
     val HOME_ALPHABET_VISIBILITY = stringPreferencesKey("home_alphabet_visibility")
     val SWIPE_UP_OPENS_DRAWER = booleanPreferencesKey("swipe_up_opens_drawer")
     val SEARCH_AUTO_FOCUS_KEYBOARD = booleanPreferencesKey("search_auto_focus_keyboard")
@@ -42,7 +43,9 @@ class PreferencesRepository(private val context: Context) {
     val REDUCED_MOTION = booleanPreferencesKey("reduced_motion")
     val LOW_EFFECTS_MODE = booleanPreferencesKey("low_effects_mode")
     val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
+    val HAPTIC_PROFILE = stringPreferencesKey("haptic_profile")
     val QUICK_ACTION_MODE = stringPreferencesKey("quick_action_mode")
+    val LOCK_APP_COMPONENT_KEY = stringPreferencesKey("lock_app_component_key")
     val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
     val WALKTHROUGH_COMPLETED = booleanPreferencesKey("walkthrough_completed")
     val FAVORITES_SEEDED = booleanPreferencesKey("favorites_seeded")
@@ -70,6 +73,7 @@ class PreferencesRepository(private val context: Context) {
       showHomeLabels = prefs[Keys.SHOW_HOME_LABELS] ?: false,
       showAlphabetIndex = prefs[Keys.SHOW_ALPHABET_INDEX] ?: true,
       showLeftHiddenAlphabet = prefs[Keys.SHOW_LEFT_HIDDEN_ALPHABET] ?: true,
+      alphabetFocusBlur = parseEnum(prefs[Keys.ALPHABET_FOCUS_BLUR], AlphabetFocusBlur.FROSTED),
       homeAlphabetVisibility = parseEnum(
         prefs[Keys.HOME_ALPHABET_VISIBILITY],
         HomeAlphabetVisibility.VISIBLE
@@ -80,7 +84,9 @@ class PreferencesRepository(private val context: Context) {
       reducedMotion = prefs[Keys.REDUCED_MOTION] ?: false,
       lowEffectsMode = prefs[Keys.LOW_EFFECTS_MODE] ?: false,
       hapticFeedback = prefs[Keys.HAPTIC_FEEDBACK] ?: true,
+      hapticProfile = parseEnum(prefs[Keys.HAPTIC_PROFILE], HapticProfile.BALANCED),
       quickActionMode = parseEnum(prefs[Keys.QUICK_ACTION_MODE], QuickActionMode.LOCK_SCREEN),
+      lockAppComponentKey = prefs[Keys.LOCK_APP_COMPONENT_KEY]?.takeIf { it.isNotBlank() },
       onboardingDismissed = prefs[Keys.ONBOARDING_DISMISSED] ?: false,
       walkthroughCompleted = prefs[Keys.WALKTHROUGH_COMPLETED] ?: false,
       favoritesSeeded = prefs[Keys.FAVORITES_SEEDED] ?: false
@@ -160,6 +166,10 @@ class PreferencesRepository(private val context: Context) {
     context.mistDataStore.edit { it[Keys.SHOW_LEFT_HIDDEN_ALPHABET] = enabled }
   }
 
+  suspend fun setAlphabetFocusBlur(preset: AlphabetFocusBlur) {
+    context.mistDataStore.edit { it[Keys.ALPHABET_FOCUS_BLUR] = preset.name }
+  }
+
   suspend fun setHomeAlphabetVisibility(visibility: HomeAlphabetVisibility) {
     context.mistDataStore.edit { it[Keys.HOME_ALPHABET_VISIBILITY] = visibility.name }
   }
@@ -188,8 +198,22 @@ class PreferencesRepository(private val context: Context) {
     context.mistDataStore.edit { it[Keys.HAPTIC_FEEDBACK] = enabled }
   }
 
+  suspend fun setHapticProfile(profile: HapticProfile) {
+    context.mistDataStore.edit { it[Keys.HAPTIC_PROFILE] = profile.name }
+  }
+
   suspend fun setQuickActionMode(mode: QuickActionMode) {
     context.mistDataStore.edit { it[Keys.QUICK_ACTION_MODE] = mode.name }
+  }
+
+  suspend fun setLockAppComponentKey(componentKey: String?) {
+    context.mistDataStore.edit { prefs ->
+      if (componentKey.isNullOrBlank()) {
+        prefs.remove(Keys.LOCK_APP_COMPONENT_KEY)
+      } else {
+        prefs[Keys.LOCK_APP_COMPONENT_KEY] = componentKey
+      }
+    }
   }
 
   suspend fun setOnboardingDismissed(dismissed: Boolean) {

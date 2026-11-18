@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <!-- Used only when user enables one-tap lock to briefly set 100ms screen-off timeout and auto-restore -->
-    <uses-permission
-        android:name="android.permission.WRITE_SETTINGS"
-        tools:ignore="ProtectedPermissions" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Android 11+ package visibility for discovering launchable applications -->
     <queries>

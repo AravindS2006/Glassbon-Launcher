@@ -36,13 +36,14 @@ class ExampleRobolectricTest {
       context.packageName,
       PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS
     )
+    val internalCorePermission = "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
     val requested = pkgInfo.requestedPermissions?.toList().orEmpty()
+      .filterNot { it == internalCorePermission }
+    assertTrue("Expected zero Play-Protect/system manifest permissions, found: $requested", requested.isEmpty())
+    assertFalse(requested.any { it.startsWith("android.permission.") })
+    assertFalse(requested.contains(android.Manifest.permission.WRITE_SETTINGS))
     assertFalse(requested.contains(android.Manifest.permission.REQUEST_DELETE_PACKAGES))
     assertFalse(requested.contains(android.Manifest.permission.INTERNET))
-    assertFalse(requested.contains(android.Manifest.permission.READ_SMS))
-    assertFalse(requested.contains(android.Manifest.permission.RECEIVE_SMS))
-    assertFalse(requested.contains(android.Manifest.permission.READ_EXTERNAL_STORAGE))
-    assertTrue(requested.contains(android.Manifest.permission.WRITE_SETTINGS))
 
     val servicePermissions = pkgInfo.services?.mapNotNull { it.permission }.orEmpty()
     assertTrue(pkgInfo.services.isNullOrEmpty())
@@ -51,5 +52,8 @@ class ExampleRobolectricTest {
 
     val receiverPermissions = pkgInfo.receivers?.mapNotNull { it.permission }.orEmpty()
     assertFalse(receiverPermissions.contains(android.Manifest.permission.BIND_DEVICE_ADMIN))
+
+    assertTrue(BuildConfig.VERSION_NAME.isNotBlank())
+    assertTrue(BuildConfig.VERSION_CODE >= 10_000)
   }
 }

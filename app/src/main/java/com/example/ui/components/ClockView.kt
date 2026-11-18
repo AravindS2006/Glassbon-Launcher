@@ -37,6 +37,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.preferences.TypographyStyle
 import com.example.platform.ClockSnapshot
 import com.example.ui.theme.EditorialDisplayFontFamily
@@ -56,6 +58,7 @@ fun ClockView(
   modifier: Modifier = Modifier
 ) {
   if (!showClock && !showDate) return
+  val haptics = LocalMistHaptics.current
 
   val primaryBrush = remember(isTopBright) {
     if (isTopBright) {
@@ -141,7 +144,10 @@ fun ClockView(
             interactionSource = remember { MutableInteractionSource() },
             indication = ripple(bounded = true, color = rippleColor),
             role = Role.Button,
-            onClick = onClockClick
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onClockClick()
+            }
           )
           .padding(horizontal = 2.dp, vertical = 2.dp)
           .testTag("home_clock_text")
@@ -162,7 +168,10 @@ fun ClockView(
             interactionSource = remember { MutableInteractionSource() },
             indication = ripple(bounded = true, color = rippleColor),
             role = Role.Button,
-            onClick = onDateClick
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onDateClick()
+            }
           ),
         contentAlignment = Alignment.CenterStart
       ) {

@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -61,7 +62,7 @@ fun rememberSystemClockSnapshot(): ClockSnapshot {
       addAction(Intent.ACTION_TIMEZONE_CHANGED)
       addAction(Intent.ACTION_LOCALE_CHANGED)
     }
-    context.registerReceiver(receiver, filter)
+    ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
     val lifecycleObserver = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {

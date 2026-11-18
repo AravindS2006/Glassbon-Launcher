@@ -1,10 +1,11 @@
 package com.example
 
-import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Intent
-import android.os.Process
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.ResolveInfo
 import android.provider.Settings
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,16 +15,20 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w411dp-h915dp-xxhdpi")
@@ -32,17 +37,35 @@ class LauncherUiRobolectricTest {
   @get:Rule
   val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-  @Test
-  fun `home screen renders clock date alphabet rail and lock button prompts write settings without calm screen`() {
-    val activity = composeTestRule.activity
-    val appOps = activity.getSystemService(AppOpsManager::class.java)
-    shadowOf(appOps).setMode(
-      AppOpsManager.OPSTR_WRITE_SETTINGS,
-      Process.myUid(),
-      activity.packageName,
-      AppOpsManager.MODE_ERRORED
-    )
+  private fun registerApp(pkg: String, label: String) {
+    val shadowPm = shadowOf(composeTestRule.activity.packageManager)
+    val mainIntent = Intent(Intent.ACTION_MAIN).apply {
+      addCategory(Intent.CATEGORY_LAUNCHER)
+    }
+    val cls = "$pkg.MainActivity"
+    val appInfo = ApplicationInfo().apply {
+      packageName = pkg
+      nonLocalizedLabel = label
+      flags = 0
+    }
+    val activityInfo = ActivityInfo().apply {
+      packageName = pkg
+      name = cls
+      nonLocalizedLabel = label
+      applicationInfo = appInfo
+      exported = true
+    }
+    val resolveInfo = ResolveInfo().apply {
+      this.activityInfo = activityInfo
+      nonLocalizedLabel = label
+    }
+    shadowPm.addResolveInfoForIntent(mainIntent, resolveInfo)
+    ComponentName(pkg, cls)
+  }
 
+  @Test
+  fun `home screen absorbs system back without reload and links lock button to android lock app`() {
+    val activity = composeTestRule.activity
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_clock_area").assertIsDisplayed()
@@ -51,32 +74,49 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_alphabet_rail_container").assertIsDisplayed()
     composeTestRule.onNodeWithTag("home_quick_actions_button").assertIsDisplayed()
 
-    // Single tap on bottom-right Lock button opens Play-Protect-safe Modify System Settings dialog when disabled
+    // Pressing system Back while resting on Home must NOT finish/reload MainActivity
+    composeTestRule.runOnUiThread {
+      activity.onBackPressedDispatcher.onBackPressed()
+    }
+    composeTestRule.waitForIdle()
+    assertFalse("Back press on Home must not finish MainActivity", activity.isFinishing)
+    composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+
+    // Register a normal app (not named Lock Screen) so unlinked Lock tap opens the picker dialog
+    val customLockPkg = "com.example.lockscreenapp"
+    registerApp(customLockPkg, "Touch Lock")
+    activity.sendBroadcast(Intent(Intent.ACTION_PACKAGE_ADDED).apply {
+      data = android.net.Uri.parse("package:$customLockPkg")
+    })
+    composeTestRule.waitForIdle()
+
+    // Single tap on bottom-right Lock button opens Link Lock Screen App picker
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_permission_dialog").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("lock_grant_write_settings_button").assertIsDisplayed().performClick()
-    composeTestRule.waitForIdle()
-    val writeSettingsIntent = shadowOf(activity).nextStartedActivity
-    assertEquals(Settings.ACTION_MANAGE_WRITE_SETTINGS, writeSettingsIntent?.action)
-    composeTestRule.onNodeWithTag("lock_permission_dialog").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertIsDisplayed()
 
-    // Grant Modify System Settings -> single tap sets 100ms screen-off timeout and restores original on SCREEN_OFF
-    shadowOf(appOps).setMode(
-      AppOpsManager.OPSTR_WRITE_SETTINGS,
-      Process.myUid(),
-      activity.packageName,
-      AppOpsManager.MODE_ALLOWED
-    )
-    Settings.System.putInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, 45_000)
+    // Picking an app from the dialog links it AND launches it immediately
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true)
+        .fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true).performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertDoesNotExist()
+    val firstLaunch = shadowOf(activity.application).nextStartedActivity
+      ?: shadowOf(activity).nextStartedActivity
+    assertEquals(customLockPkg, firstLaunch?.component?.packageName)
+
+    // Subsequent tap on Lock button launches the linked app directly without showing the picker
+    ShadowSystemClock.advanceBy(Duration.ofMillis(400))
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
-    assertEquals(100, Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT))
-    activity.sendBroadcast(Intent(Intent.ACTION_SCREEN_OFF).setPackage(activity.packageName))
-    composeTestRule.waitForIdle()
-    assertEquals(45_000, Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT))
+    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertDoesNotExist()
+    val directLaunch = shadowOf(activity.application).nextStartedActivity
+      ?: shadowOf(activity).nextStartedActivity
+    assertEquals(customLockPkg, directLaunch?.component?.packageName)
 
-    // Long press opens Quick Actions with Lock Screen row and NO OLED Calm Screen row
+    // Long press opens Quick Actions with Lock Screen row (showing linked badge) and NO OLED Calm Screen row
     composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput { longClick() }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
@@ -179,6 +219,15 @@ class LauncherUiRobolectricTest {
         .fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithText("Ultra-Smooth active", substring = true).assertIsDisplayed()
+
+    // Alphabet Focus Blur, Haptic Feel presets & GitHub-tag BuildConfig version are accessible in Preferences
+    composeTestRule.onNodeWithTag("focus_blur_deep").performScrollTo().assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("haptic_profile_crisp").performScrollTo().assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("settings_lock_app_row").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("settings_version_info").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("Glassbon v${BuildConfig.VERSION_NAME}", substring = true).assertIsDisplayed()
 
     composeTestRule.onNodeWithTag("settings_back_button").performClick()
     composeTestRule.waitForIdle()

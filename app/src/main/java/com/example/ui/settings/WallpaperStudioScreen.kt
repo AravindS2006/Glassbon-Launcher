@@ -45,9 +45,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.ui.LauncherUiState
 import com.example.ui.components.GlassSurface
-import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import kotlin.math.roundToInt
@@ -64,6 +65,7 @@ fun WallpaperStudioScreen(
 ) {
   BackHandler(onBack = onClose)
   val prefs = uiState.preferences
+  val haptics = LocalMistHaptics.current
 
   val photoPickerLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.PickVisualMedia(),
@@ -96,7 +98,10 @@ fun WallpaperStudioScreen(
           modifier = Modifier.padding(end = 16.dp)
         ) {
           IconButton(
-            onClick = onClose,
+            onClick = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onClose()
+            },
             modifier = Modifier.testTag("wallpaper_back_button")
           ) {
             Icon(
@@ -134,6 +139,7 @@ fun WallpaperStudioScreen(
         ) {
           Button(
             onClick = {
+              haptics.trigger(MistHapticEvent.CONFIRM)
               photoPickerLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
               )
@@ -157,7 +163,10 @@ fun WallpaperStudioScreen(
 
           if (prefs.customWallpaperPath != null) {
             OutlinedButton(
-              onClick = onRestoreDefault,
+              onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                onRestoreDefault()
+              },
               colors = ButtonDefaults.outlinedButtonColors(contentColor = MistColors.OffWhite),
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier
@@ -177,7 +186,10 @@ fun WallpaperStudioScreen(
           verticalAlignment = Alignment.CenterVertically,
           modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSetGrayscale(!prefs.grayscaleWallpaper) }
+            .clickable {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onSetGrayscale(!prefs.grayscaleWallpaper)
+            }
             .padding(vertical = 2.dp)
         ) {
           Text(
@@ -189,7 +201,10 @@ fun WallpaperStudioScreen(
           )
           Switch(
             checked = prefs.grayscaleWallpaper,
-            onCheckedChange = onSetGrayscale,
+            onCheckedChange = {
+              haptics.trigger(MistHapticEvent.TAP_LIGHT)
+              onSetGrayscale(it)
+            },
             colors = SwitchDefaults.colors(
               checkedThumbColor = MistColors.NearBlack,
               checkedTrackColor = MistColors.OffWhite,

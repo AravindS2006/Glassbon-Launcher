@@ -195,19 +195,36 @@ class AppRepository(
 
     val component = ComponentName(app.packageName, app.activityName)
     return try {
-      if (launcherApps != null) {
-        val exists = launcherApps.getActivityList(app.packageName, Process.myUserHandle())
-          .any { it.componentName == component }
-        if (exists) {
-          launcherApps.startMainActivity(component, Process.myUserHandle(), null, null)
-          return true
-        }
-      }
       val launchIntent = Intent.makeMainActivity(component).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
       }
       context.startActivity(launchIntent)
       true
+    } catch (primaryEx: ActivityNotFoundException) {
+      launchViaLauncherAppsOrRefresh(component, app.packageName, primaryEx)
+    } catch (_: SecurityException) {
+      launchViaLauncherAppsOrRefresh(component, app.packageName, null)
+    } catch (_: IllegalArgumentException) {
+      refreshApps()
+      false
+    }
+  }
+
+  private fun launchViaLauncherAppsOrRefresh(
+    component: ComponentName,
+    packageName: String,
+    primaryFailure: ActivityNotFoundException?
+  ): Boolean {
+    return try {
+      val exists = launcherApps?.getActivityList(packageName, Process.myUserHandle())
+        ?.any { it.componentName == component } == true
+      if (exists) {
+        launcherApps?.startMainActivity(component, Process.myUserHandle(), null, null)
+        true
+      } else {
+        if (primaryFailure != null) refreshApps()
+        false
+      }
     } catch (_: ActivityNotFoundException) {
       refreshApps()
       false

@@ -25,11 +25,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.ui.theme.MistColors
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -46,7 +46,7 @@ fun FloatingCircleButton(
 ) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-  val haptics = LocalHapticFeedback.current
+  val haptics = LocalMistHaptics.current
   val scale by animateFloatAsState(
     targetValue = if (isPressed && !reducedMotion) 0.90f else 1f,
     animationSpec = spring(
@@ -86,11 +86,16 @@ fun FloatingCircleButton(
         interactionSource = interactionSource,
         indication = ripple(bounded = true, color = MistColors.PureWhite),
         role = Role.Button,
-        onClick = onClick,
+        onClick = {
+          if (hapticFeedback) {
+            haptics.trigger(MistHapticEvent.CONFIRM)
+          }
+          onClick()
+        },
         onLongClick = if (onLongClick != null) {
           {
             if (hapticFeedback) {
-              haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+              haptics.trigger(MistHapticEvent.LONG_PRESS)
             }
             onLongClick()
           }

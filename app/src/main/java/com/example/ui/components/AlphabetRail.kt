@@ -38,11 +38,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +50,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.apps.AppIndexHelper
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
@@ -88,7 +88,7 @@ fun AlphabetRail(
   onDragEnd: () -> Unit = {}
 ) {
   val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
-  val haptics = LocalHapticFeedback.current
+  val haptics = LocalMistHaptics.current
   val density = LocalDensity.current
 
   val railHeightPxState = remember { mutableIntStateOf(1) }
@@ -221,11 +221,12 @@ fun AlphabetRail(
     }
 
     if (idx != lastSelectedIndex) {
+      val hadPreviousSelection = lastSelectedIndex != -1
       lastSelectedIndex = idx
       val selected = entries[idx]
       scrubbedKeyState.value = selected
-      if (hapticEnabled) {
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+      if (hapticEnabled && hadPreviousSelection) {
+        haptics.trigger(MistHapticEvent.WAVE_LETTER_TICK)
       }
       if (emitSelect) {
         onSelectKey(selected)
@@ -264,6 +265,9 @@ fun AlphabetRail(
             dragPullTargetState.floatValue = 0f
             smoothedPointerYState.floatValue = downY.coerceIn(verticalPadPx, (railHeightPxState.intValue - verticalPadPx).coerceAtLeast(verticalPadPx))
             onDragPullChanged(0f)
+            if (hapticEnabled) {
+              haptics.trigger(MistHapticEvent.WAVE_ENGAGE)
+            }
             dispatchContinuousForY(downY, emitSelect = true, emitContinuous = false)
 
             while (true) {
@@ -301,6 +305,9 @@ fun AlphabetRail(
             onDragPullChanged(0f)
             lastSelectedIndex = -1
             scrubbedKeyState.value = null
+            if (hapticEnabled) {
+              haptics.trigger(MistHapticEvent.WAVE_RELEASE)
+            }
             onDragEnd()
           }
         }

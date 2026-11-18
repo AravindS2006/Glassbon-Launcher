@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.apps.AppInfo
 import com.example.ui.LauncherUiState
 import com.example.ui.components.GlassSurface
@@ -55,6 +57,7 @@ fun HiddenAppsScreen(
   onClose: () -> Unit
 ) {
   BackHandler(onBack = onClose)
+  val haptics = LocalMistHaptics.current
 
   Box(
     modifier = Modifier
@@ -76,7 +79,10 @@ fun HiddenAppsScreen(
           .fillMaxWidth()
           .padding(horizontal = 12.dp, vertical = 10.dp)
       ) {
-        IconButton(onClick = onClose) {
+        IconButton(onClick = {
+          haptics.trigger(MistHapticEvent.TAP_LIGHT)
+          onClose()
+        }) {
           Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = stringResource(R.string.cd_back),
@@ -152,7 +158,10 @@ fun HiddenAppsScreen(
                   overflow = TextOverflow.Ellipsis,
                   modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = { onUnhideApp(app) }) {
+                TextButton(onClick = {
+                  haptics.trigger(MistHapticEvent.CONFIRM)
+                  onUnhideApp(app)
+                }) {
                   Text(
                     text = "Restore",
                     fontFamily = FunctionalSansFontFamily,

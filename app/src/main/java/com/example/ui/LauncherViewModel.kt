@@ -13,6 +13,8 @@ import com.example.data.apps.AppRepository
 import com.example.data.apps.AppSection
 import com.example.data.media.ActiveMediaState
 import com.example.data.media.MediaRepository
+import com.example.data.preferences.AlphabetFocusBlur
+import com.example.data.preferences.HapticProfile
 import com.example.data.preferences.HomeAlphabetVisibility
 import com.example.data.preferences.IconSize
 import com.example.data.preferences.IconStyle
@@ -24,8 +26,7 @@ import com.example.data.preferences.TypographyStyle
 import com.example.data.wallpaper.ProcessedWallpaper
 import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
-import com.example.platform.ScreenTimeoutLockHelper
-import com.example.platform.ScreenTimeoutLockResult
+import com.example.platform.LockScreenAppHelper
 import com.example.platform.SystemActionsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -56,11 +57,13 @@ enum class LauncherOverlay {
 sealed interface DrawerRowItem {
   val rowKey: String
   val contentType: String
+  val sectionKey: String
 
   @Immutable
   data class Header(
     override val rowKey: String,
     val title: String,
+    override val sectionKey: String,
     val isFavoritesHeader: Boolean = false
   ) : DrawerRowItem {
     override val contentType: String = "header"
@@ -69,6 +72,7 @@ sealed interface DrawerRowItem {
   @Immutable
   data class App(
     override val rowKey: String,
+    override val sectionKey: String,
     val app: AppInfo
   ) : DrawerRowItem {
     override val contentType: String = "app_row"
@@ -92,13 +96,14 @@ data class LauncherUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
-  val showLockPermissionDialog: Boolean = false,
+  val showLockAppPickerDialog: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isScreenLockEnabled: Boolean = false,
+  val linkedLockApp: AppInfo? = null,
+  val suggestedLockApps: List<AppInfo> = emptyList(),
   val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
   val wallpaper: ProcessedWallpaper = ProcessedWallpaper(null, null, isTopBright = true),
@@ -115,6 +120,8 @@ private data class DerivedAppsBundle(
   val sectionIndexMap: Map<String, Int>,
   val homeShortcutApps: List<AppInfo>,
   val hiddenApps: List<AppInfo>,
+  val linkedLockApp: AppInfo?,
+  val suggestedLockApps: List<AppInfo>,
   val prefs: LauncherPreferences
 )
 
@@ -124,13 +131,13 @@ private data class TransientUiState(
   val drawerJumpTarget: String? = null,
   val isSearchActive: Boolean = false,
   val showQuickActions: Boolean = false,
-  val showLockPermissionDialog: Boolean = false,
+  val showLockAppPickerDialog: Boolean = false,
+  val launchLockAppAfterPick: Boolean = false,
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
-  val isScreenLockEnabled: Boolean = false,
   val statusMessage: String? = null
 )
 
@@ -147,8 +154,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   private val transientState = MutableStateFlow(
     TransientUiState(
-      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-      isScreenLockEnabled = ScreenTimeoutLockHelper.canWriteSystemSettings(appContext)
+      isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
     )
   )
   private val wallpaperState = MutableStateFlow(
@@ -186,18 +192,34 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val sectionIndexMap = LinkedHashMap<String, Int>(sections.size + 1)
     if (favoriteApps.isNotEmpty()) {
       sectionIndexMap["★"] = 0
-      drawerRows.add(DrawerRowItem.Header("header_favorites", "", isFavoritesHeader = true))
+      drawerRows.add(
+        DrawerRowItem.Header(
+          rowKey = "header_favorites",
+          title = "",
+          sectionKey = "★",
+          isFavoritesHeader = true
+        )
+      )
       for (fav in favoriteApps) {
-        drawerRows.add(DrawerRowItem.App("fav_${fav.componentKey}", fav))
+        drawerRows.add(DrawerRowItem.App("fav_${fav.componentKey}", "★", fav))
       }
     }
     for (section in sections) {
       sectionIndexMap[section.header] = drawerRows.size
-      drawerRows.add(DrawerRowItem.Header("section_${section.header}", section.header))
+      drawerRows.add(
+        DrawerRowItem.Header(
+          rowKey = "section_${section.header}",
+          title = section.header,
+          sectionKey = section.header
+        )
+      )
       for (app in section.apps) {
-        drawerRows.add(DrawerRowItem.App("${section.header}_${app.componentKey}", app))
+        drawerRows.add(DrawerRowItem.App("${section.header}_${app.componentKey}", section.header, app))
       }
     }
+
+    val linkedLockApp = LockScreenAppHelper.resolveLinkedApp(prefs.lockAppComponentKey, allApps)
+    val suggestedLockApps = LockScreenAppHelper.findSuggestedLockApps(allApps)
 
     DerivedAppsBundle(
       loading = loading,
@@ -209,6 +231,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       sectionIndexMap = sectionIndexMap,
       homeShortcutApps = homeShortcutApps,
       hiddenApps = hiddenApps,
+      linkedLockApp = linkedLockApp,
+      suggestedLockApps = suggestedLockApps,
       prefs = prefs
     )
   }.flowOn(Dispatchers.Default)
@@ -241,13 +265,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       drawerJumpTarget = transient.drawerJumpTarget,
       isSearchActive = transient.isSearchActive,
       showQuickActions = transient.showQuickActions,
-      showLockPermissionDialog = transient.showLockPermissionDialog,
+      showLockAppPickerDialog = transient.showLockAppPickerDialog,
       showWalkthrough = transient.showWalkthrough,
       walkthroughStep = transient.walkthroughStep,
       activeOverlay = transient.activeOverlay,
       contextMenuApp = transient.contextMenuApp,
       isDefaultLauncher = transient.isDefaultLauncher,
-      isScreenLockEnabled = transient.isScreenLockEnabled,
+      linkedLockApp = derived.linkedLockApp,
+      suggestedLockApps = derived.suggestedLockApps,
       activeMedia = media,
       preferences = derived.prefs,
       wallpaper = wallpaper,
@@ -348,8 +373,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onAppStart() {
     mediaRepository.startObserving()
-    ScreenTimeoutLockHelper.ensureReceiverRegistered(appContext)
-    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
     refreshSystemStatus()
   }
 
@@ -358,11 +381,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun refreshSystemStatus() {
-    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
     transientState.update {
       it.copy(
-        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext),
-        isScreenLockEnabled = ScreenTimeoutLockHelper.canWriteSystemSettings(appContext)
+        isDefaultLauncher = DefaultLauncherHelper.isDefaultLauncher(appContext)
       )
     }
   }
@@ -375,9 +396,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         isSearchActive = false,
         searchQuery = "",
         showQuickActions = false,
+        showLockAppPickerDialog = false,
+        launchLockAppAfterPick = false,
         showWalkthrough = false,
         activeOverlay = LauncherOverlay.NONE,
-        contextMenuApp = null
+        contextMenuApp = null,
+        statusMessage = null
       )
     }
   }
@@ -436,7 +460,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onHomePowerButtonTap(context: Context = appContext) {
     when (uiState.value.preferences.quickActionMode) {
-      QuickActionMode.LOCK_SCREEN -> triggerScreenLock(context)
+      QuickActionMode.LOCK_SCREEN -> triggerScreenLock()
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
@@ -444,57 +468,98 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
   }
 
-  fun triggerScreenLock(context: Context = appContext) {
-    when (ScreenTimeoutLockHelper.triggerShortTimeoutLock(context)) {
-      ScreenTimeoutLockResult.LOCKING_VIA_TIMEOUT -> {
-        transientState.update {
-          it.copy(
-            showQuickActions = false,
-            showLockPermissionDialog = false,
-            contextMenuApp = null,
-            isScreenLockEnabled = true
-          )
-        }
+  fun triggerScreenLock() {
+    val state = uiState.value
+    val linked = state.linkedLockApp
+    if (linked != null) {
+      val launched = appRepository.launchApp(linked)
+      transientState.update {
+        it.copy(
+          showQuickActions = false,
+          showLockAppPickerDialog = !launched,
+          launchLockAppAfterPick = !launched,
+          contextMenuApp = null,
+          statusMessage = if (launched) null else "${linked.label} unavailable — link another Lock Screen app"
+        )
       }
-      ScreenTimeoutLockResult.NEEDS_WRITE_SETTINGS_PERMISSION -> {
-        transientState.update {
-          it.copy(
-            isScreenLockEnabled = false,
-            showQuickActions = false,
-            showLockPermissionDialog = true,
-            contextMenuApp = null
-          )
-        }
-      }
-      ScreenTimeoutLockResult.FAILED -> {
-        transientState.update {
-          it.copy(
-            showQuickActions = false,
-            showLockPermissionDialog = false,
-            statusMessage = "Unable to apply screen-off timeout."
-          )
-        }
-      }
+      return
     }
+
+    val autoCandidate = LockScreenAppHelper.pickAutoLinkCandidate(state.allApps)
+    if (autoCandidate != null && appRepository.launchApp(autoCandidate)) {
+      viewModelScope.launch {
+        preferencesRepository.setLockAppComponentKey(autoCandidate.componentKey)
+      }
+      transientState.update {
+        it.copy(
+          showQuickActions = false,
+          showLockAppPickerDialog = false,
+          launchLockAppAfterPick = false,
+          contextMenuApp = null,
+          statusMessage = "Linked to ${autoCandidate.label}"
+        )
+      }
+      return
+    }
+
+    openLockAppPicker(launchAfterPick = true)
   }
 
-  fun openLockPermissionPrompt() {
+  fun openLockAppPicker(launchAfterPick: Boolean = false) {
     transientState.update {
       it.copy(
         showQuickActions = false,
-        showLockPermissionDialog = true
+        showLockAppPickerDialog = true,
+        launchLockAppAfterPick = launchAfterPick,
+        contextMenuApp = null
       )
     }
   }
 
-  fun dismissLockPermissionDialog() {
-    transientState.update { it.copy(showLockPermissionDialog = false) }
+  fun dismissLockAppPicker() {
+    transientState.update {
+      it.copy(
+        showLockAppPickerDialog = false,
+        launchLockAppAfterPick = false
+      )
+    }
   }
 
-  fun openWriteSettingsPermission(context: Context = appContext) {
-    transientState.update { it.copy(showLockPermissionDialog = false) }
-    if (!ScreenTimeoutLockHelper.openWriteSettingsPermission(context)) {
-      transientState.update { it.copy(statusMessage = "System settings screen unavailable.") }
+  fun selectLockScreenApp(app: AppInfo) {
+    val shouldLaunch = transientState.value.launchLockAppAfterPick
+    transientState.update {
+      it.copy(
+        showLockAppPickerDialog = false,
+        launchLockAppAfterPick = false
+      )
+    }
+    viewModelScope.launch {
+      preferencesRepository.setLockAppComponentKey(app.componentKey)
+    }
+    if (shouldLaunch) {
+      val launched = appRepository.launchApp(app)
+      if (!launched) {
+        transientState.update {
+          it.copy(statusMessage = "${app.label} is unavailable.")
+        }
+      }
+    } else {
+      transientState.update {
+        it.copy(statusMessage = "Lock button linked to ${app.label}")
+      }
+    }
+  }
+
+  fun clearLockScreenApp() {
+    transientState.update {
+      it.copy(
+        showLockAppPickerDialog = false,
+        launchLockAppAfterPick = false,
+        statusMessage = "Lock Screen app link cleared"
+      )
+    }
+    viewModelScope.launch {
+      preferencesRepository.setLockAppComponentKey(null)
     }
   }
 
@@ -712,6 +777,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     viewModelScope.launch { preferencesRepository.setShowLeftHiddenAlphabet(enabled) }
   }
 
+  fun setAlphabetFocusBlur(preset: AlphabetFocusBlur) {
+    viewModelScope.launch { preferencesRepository.setAlphabetFocusBlur(preset) }
+  }
+
   fun setHomeAlphabetVisibility(visibility: HomeAlphabetVisibility) {
     viewModelScope.launch { preferencesRepository.setHomeAlphabetVisibility(visibility) }
   }
@@ -740,6 +809,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     viewModelScope.launch { preferencesRepository.setHapticFeedback(enabled) }
   }
 
+  fun setHapticProfile(profile: HapticProfile) {
+    viewModelScope.launch { preferencesRepository.setHapticProfile(profile) }
+  }
+
   fun setQuickActionMode(mode: QuickActionMode) {
     viewModelScope.launch { preferencesRepository.setQuickActionMode(mode) }
   }
@@ -750,8 +823,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   override fun onCleared() {
     super.onCleared()
-    ScreenTimeoutLockHelper.restoreOriginalTimeoutIfNeeded(appContext)
-    ScreenTimeoutLockHelper.unregisterReceiver(appContext)
     appRepository.stopObserving()
     mediaRepository.stopObserving()
     iconCache.clear()

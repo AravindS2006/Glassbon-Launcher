@@ -1,6 +1,6 @@
 {
   "name": "Glassbon",
-  "description": "Minimalist liquid frosted-glass Android launcher with curved alphabet navigation, monochrome squircle iconography, audio media capsule, and OLED calm mode.",
+  "description": "Minimalist liquid frosted-glass Android launcher with curved alphabet navigation, sculpted tactile haptics, monochrome squircle iconography, and audio media capsule.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

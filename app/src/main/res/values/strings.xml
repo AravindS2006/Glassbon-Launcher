@@ -48,9 +48,8 @@
     <string name="tour_back">Back</string>
     <string name="tour_next">Next</string>
     <string name="tour_finish">Start Using Glassbon</string>
-    <string name="lock_dialog_title">Enable One-Tap Screen Lock</string>
-    <string name="lock_dialog_body">To sleep and lock your screen without sensitive Accessibility permissions, Glassbon briefly sets the display timeout to 100ms and immediately restores your normal timeout once the screen turns off.</string>
-    <string name="lock_dialog_grant_write_settings">Allow Modify System Settings</string>
-    <string name="lock_dialog_open_security_settings">Screen Lock Settings</string>
+    <string name="lock_app_dialog_title">Link Lock Screen App</string>
+    <string name="lock_app_dialog_body">Choose an installed Android Lock Screen or Screen Off utility to launch when you tap the bottom-right lock button. Glassbon runs with zero background permissions.</string>
+    <string name="lock_dialog_open_security_settings">Android Lock Screen Settings</string>
     <string name="lock_dialog_cancel">Cancel</string>
 </resources>

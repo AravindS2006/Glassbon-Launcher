@@ -8,6 +8,39 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val rawVersionTag: String = sequenceOf(
+  providers.gradleProperty("appVersionTag").orNull,
+  providers.environmentVariable("VERSION_TAG").orNull,
+  providers.environmentVariable("GITHUB_REF_NAME")
+    .orNull
+    ?.takeIf { tag ->
+      val ref = providers.environmentVariable("GITHUB_REF").orNull.orEmpty()
+      ref.startsWith("refs/tags/") && tag.isNotBlank()
+    },
+  providers.exec {
+    commandLine("git", "describe", "--tags", "--abbrev=0")
+    isIgnoreExitValue = true
+  }.standardOutput.asText.map { it.trim() }.orNull
+)
+  .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
+  .firstOrNull() ?: "v1.0.0"
+
+val normalizedVersionName: String = rawVersionTag.removePrefix("v").removePrefix("V")
+  .ifBlank { "1.0.0" }
+
+val computedVersionCode: Int = run {
+  val match = Regex("""^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(\d+))?""").find(normalizedVersionName)
+  if (match != null) {
+    val major = match.groupValues[1].toIntOrNull() ?: 1
+    val minor = match.groupValues[2].toIntOrNull() ?: 0
+    val patch = match.groupValues[3].toIntOrNull() ?: 0
+    val buildOffset = match.groupValues[4].toIntOrNull() ?: 0
+    (major * 10_000 + minor * 100 + patch + buildOffset).coerceAtLeast(1)
+  } else {
+    10_000
+  }
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -16,8 +49,8 @@ android {
     applicationId = "com.aistudio.mistlauncher.kxmpzq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = computedVersionCode
+    versionName = normalizedVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

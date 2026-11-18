@@ -49,8 +49,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.graphics.AppIconCache
+import com.example.core.haptics.LocalMistHaptics
+import com.example.core.haptics.MistHapticEvent
 import com.example.data.apps.AppInfo
 import com.example.data.preferences.HomeAlphabetVisibility
 import com.example.data.preferences.QuickActionMode
@@ -105,7 +105,7 @@ fun HomeScreen(
   modifier: Modifier = Modifier
 ) {
   val prefs = uiState.preferences
-  val haptics = LocalHapticFeedback.current
+  val haptics = LocalMistHaptics.current
 
   val availableSections = remember(uiState.sections) {
     uiState.sections.map { it.header }.toSet()
@@ -224,11 +224,12 @@ fun HomeScreen(
                 .combinedClickable(
                   interactionSource = interactionSource,
                   indication = ripple(bounded = true, color = MistColors.PureWhite),
-                  onClick = { onLaunchApp(app) },
+                  onClick = {
+                    haptics.trigger(MistHapticEvent.CONFIRM)
+                    onLaunchApp(app)
+                  },
                   onLongClick = {
-                    if (prefs.hapticFeedback) {
-                      haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    }
+                    haptics.trigger(MistHapticEvent.LONG_PRESS)
                     onLongPressApp(app)
                   }
                 )
@@ -362,7 +363,10 @@ fun HomeScreen(
           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (!prefs.walkthroughCompleted) {
               TextButton(
-                onClick = onStartTour,
+                onClick = {
+                  haptics.trigger(MistHapticEvent.CONFIRM)
+                  onStartTour()
+                },
                 modifier = Modifier
                   .heightIn(min = 36.dp)
                   .testTag("home_start_tour_button")
@@ -377,7 +381,10 @@ fun HomeScreen(
             }
             if (needsDefaultPrompt) {
               TextButton(
-                onClick = onRequestDefaultHome,
+                onClick = {
+                  haptics.trigger(MistHapticEvent.CONFIRM)
+                  onRequestDefaultHome()
+                },
                 modifier = Modifier
                   .heightIn(min = 36.dp)
                   .testTag("onboarding_set_default_button")
@@ -391,7 +398,10 @@ fun HomeScreen(
               }
             }
             TextButton(
-              onClick = onDismissOnboarding,
+              onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                onDismissOnboarding()
+              },
               modifier = Modifier
                 .heightIn(min = 36.dp)
                 .testTag("onboarding_dismiss_button")

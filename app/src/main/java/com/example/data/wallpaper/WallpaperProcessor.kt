@@ -35,17 +35,19 @@ class WallpaperProcessor(private val context: Context) {
     val dir = File(context.filesDir, "wallpapers").apply { mkdirs() }
     val targetFile = File(dir, "custom_wallpaper_${System.currentTimeMillis()}.jpg")
 
-    dir.listFiles()?.forEach { old ->
-      if (old.name.startsWith("custom_wallpaper_")) old.delete()
-    }
-
     val decoded = decodeSampledFromUri(uri, maxDimension = 1280) ?: return@withContext null
     return@withContext try {
       FileOutputStream(targetFile).use { out ->
         decoded.compress(Bitmap.CompressFormat.JPEG, 90, out)
       }
+      dir.listFiles()?.forEach { old ->
+        if (old.name.startsWith("custom_wallpaper_") && old.absolutePath != targetFile.absolutePath) {
+          old.delete()
+        }
+      }
       targetFile.absolutePath
     } catch (_: Exception) {
+      targetFile.delete()
       null
     } finally {
       decoded.recycle()
