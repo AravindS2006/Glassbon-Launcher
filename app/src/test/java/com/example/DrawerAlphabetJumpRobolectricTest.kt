@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -241,6 +242,75 @@ class DrawerAlphabetJumpRobolectricTest {
       }
       composeTestRule.waitForIdle()
       composeTestRule.onAllNodesWithTag("alphabet_rail").assertCountEquals(1)
+    }
+  }
+
+  @Test
+  fun `low power mode eliminates drawer blur passes and disables motion and wallpaper blur`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    registerSyntheticApps(context)
+
+    ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+      var mainActivity: MainActivity? = null
+      scenario.onActivity { mainActivity = it }
+      val activity = requireNotNull(mainActivity)
+      val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
+
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
+          .fetchSemanticsNodes().isNotEmpty()
+      }
+
+      // Switch to Low Power mode via Quick Actions -> Preferences -> Low Power
+      composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput {
+        down(center)
+        advanceEventTime(700L)
+        up()
+      }
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag("qa_preferences").assertIsDisplayed().performClick()
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag("perf_mode_power_saver").assertIsDisplayed().performClick()
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        composeTestRule.onAllNodesWithText("Low Power active", substring = true)
+          .fetchSemanticsNodes().isNotEmpty()
+      }
+      val lowPowerState = viewModel.uiState.value
+      assertTrue("Expected isPowerSaver=true", lowPowerState.preferences.isPowerSaver)
+      assertTrue("Expected effectiveReducedMotion=true", lowPowerState.preferences.effectiveReducedMotion)
+      assertTrue("Expected effectiveLowEffects=true", lowPowerState.preferences.effectiveLowEffects)
+      val deadlineMs = System.currentTimeMillis() + 10_000L
+      while (viewModel.uiState.value.wallpaper.drawerBlurredBitmap != null && System.currentTimeMillis() < deadlineMs) {
+        composeTestRule.mainClock.advanceTimeBy(50L)
+        composeTestRule.waitForIdle()
+        Thread.sleep(50L)
+      }
+      val wpState = viewModel.uiState.value
+      org.junit.Assert.assertNull(
+        "Expected null drawerBlurredBitmap in Low Power; prefs=${wpState.preferences.performanceProfile}/" +
+          "lowEffects=${wpState.preferences.effectiveLowEffects}, homeBitmap=${wpState.wallpaper.homeBitmap != null}",
+        wpState.wallpaper.drawerBlurredBitmap
+      )
+      composeTestRule.onNodeWithTag("settings_back_button").performClick()
+      composeTestRule.waitForIdle()
+
+      // Jump to G -> centered cleanly, but zero blur FBOs allocated on neighbor rows
+      composeTestRule.onNodeWithTag("alphabet_rail_key_G", useUnmergedTree = true).performClick()
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.glassnotes", useUnmergedTree = true)
+          .fetchSemanticsNodes().isNotEmpty()
+      }
+      composeTestRule.waitForIdle()
+
+      assertSectionCenteredAndFullyVisible(
+        headerTag = "drawer_section_G",
+        firstAppTag = "drawer_app_row_com.test.gallery",
+        lastAppTag = "drawer_app_row_com.test.glassnotes"
+      )
+      val fAppLowPowerCfg = composeTestRule.onNodeWithTag("drawer_app_row_com.test.files", useUnmergedTree = true)
+        .fetchSemanticsNode().config
+      assertEquals(0f, fAppLowPowerCfg[DrawerFocusBlurRadiusKey], 0.01f)
+      assertTrue("Low Power keeps optical dim without Gaussian blur", fAppLowPowerCfg[DrawerFocusAlphaKey] < 0.5f)
     }
   }
 }

@@ -141,7 +141,7 @@ fun QuickActionsOverlay(
         QuickActionRow(
           icon = Icons.Rounded.PowerSettingsNew,
           label = stringResource(R.string.action_lock_screen),
-          badge = linkedLockAppLabel ?: "Link App",
+          badge = linkedLockAppLabel ?: "Pick App",
           testTag = "qa_lock_screen",
           onClick = onLockScreen
         )

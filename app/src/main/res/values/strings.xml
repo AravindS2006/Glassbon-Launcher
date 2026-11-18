@@ -2,6 +2,9 @@
     <string name="app_name">Glassbon</string>
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
     <string name="cd_open_quick_actions">Lock screen or hold for quick actions</string>
+    <string name="cd_open_preferences_or_quick_actions">Open Glassbon preferences or hold for quick actions</string>
+    <string name="power_hold_hint">Hold ⏻ for Preferences</string>
+    <string name="cd_dismiss_hint">Dismiss hint</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_close_search">Close search</string>
@@ -13,8 +16,8 @@
     <string name="cd_media_next">Next track</string>
     <string name="onboarding_title">Set Glassbon as your Home</string>
     <string name="onboarding_tour_only_title">Explore Glassbon</string>
-    <string name="onboarding_body">Make Glassbon your default launcher to return here whenever you press Home.</string>
-    <string name="onboarding_tour_only_body">Take a quick interactive tour of dual-edge wave scrubbing, adaptive contrast, and one-tap gestures.</string>
+    <string name="onboarding_body">Make Glassbon default Home. Hold bottom-right ⏻ anytime for Preferences.</string>
+    <string name="onboarding_tour_only_body">Take a quick tour of wave scrubbing &amp; gestures, or hold bottom-right ⏻ anytime for Preferences.</string>
     <string name="onboarding_cta">Set Default</string>
     <string name="onboarding_start_tour">Take Tour</string>
     <string name="onboarding_dismiss">Later</string>

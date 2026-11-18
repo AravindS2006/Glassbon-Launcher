@@ -42,35 +42,37 @@ fun FloatingCircleButton(
   modifier: Modifier = Modifier,
   onLongClick: (() -> Unit)? = null,
   hapticFeedback: Boolean = true,
-  reducedMotion: Boolean = false
+  reducedMotion: Boolean = false,
+  lowPowerMode: Boolean = false
 ) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val haptics = LocalMistHaptics.current
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed && !reducedMotion) 0.90f else 1f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioNoBouncy,
-      stiffness = Spring.StiffnessMedium
-    ),
-    label = "floating_btn_scale"
-  )
 
-  val fillBrush = Brush.verticalGradient(
-    colors = listOf(MistColors.FloatingButtonFillTop, MistColors.FloatingButtonFillBottom)
-  )
-  val borderBrush = Brush.linearGradient(
-    colors = listOf(MistColors.SpecularRimTop, MistColors.SpecularRimMid, MistColors.SpecularRimBottom)
-  )
+  val scaleModifier = if (reducedMotion) {
+    Modifier
+  } else {
+    val scale by animateFloatAsState(
+      targetValue = if (isPressed) 0.90f else 1f,
+      animationSpec = spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium
+      ),
+      label = "floating_btn_scale"
+    )
+    Modifier.graphicsLayer {
+      scaleX = scale
+      scaleY = scale
+    }
+  }
 
-  Box(
-    modifier = modifier
-      .testTag(testTag)
-      .size(54.dp)
-      .graphicsLayer {
-        scaleX = scale
-        scaleY = scale
-      }
+  val surfaceModifier = if (lowPowerMode) {
+    Modifier
+      .clip(CircleShape)
+      .background(MistColors.FloatingButtonFillBottom)
+      .border(0.75.dp, MistColors.FrostedPanelBorder, CircleShape)
+  } else {
+    Modifier
       .drawBehind {
         drawCircle(
           brush = Brush.radialGradient(
@@ -80,8 +82,16 @@ fun FloatingCircleButton(
         )
       }
       .clip(CircleShape)
-      .background(fillBrush)
-      .border(0.85.dp, borderBrush, CircleShape)
+      .background(FLOATING_BTN_FILL_BRUSH)
+      .border(0.85.dp, FLOATING_BTN_BORDER_BRUSH, CircleShape)
+  }
+
+  Box(
+    modifier = modifier
+      .testTag(testTag)
+      .size(54.dp)
+      .then(scaleModifier)
+      .then(surfaceModifier)
       .combinedClickable(
         interactionSource = interactionSource,
         indication = ripple(bounded = true, color = MistColors.PureWhite),
@@ -113,3 +123,11 @@ fun FloatingCircleButton(
     )
   }
 }
+
+private val FLOATING_BTN_FILL_BRUSH = Brush.verticalGradient(
+  colors = listOf(MistColors.FloatingButtonFillTop, MistColors.FloatingButtonFillBottom)
+)
+
+private val FLOATING_BTN_BORDER_BRUSH = Brush.linearGradient(
+  colors = listOf(MistColors.SpecularRimTop, MistColors.SpecularRimMid, MistColors.SpecularRimBottom)
+)

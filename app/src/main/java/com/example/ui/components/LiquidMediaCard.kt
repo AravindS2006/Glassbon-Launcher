@@ -1,6 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -245,7 +247,11 @@ private fun LiquidWipeArtwork(
     AnimatedContent(
       targetState = artwork,
       transitionSpec = {
-        fadeIn(tween(220)) togetherWith fadeOut(tween(300))
+        if (reducedMotion) {
+          EnterTransition.None togetherWith ExitTransition.None
+        } else {
+          fadeIn(tween(220)) togetherWith fadeOut(tween(300))
+        }
       },
       label = "liquid_media_art"
     ) { bmp ->

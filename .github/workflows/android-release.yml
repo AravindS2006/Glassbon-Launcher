@@ -17,6 +17,10 @@ on:
         description: "Optional version tag for manual APK release (e.g. v1.0.0)"
         required: false
         default: ""
+      release_notes:
+        description: "Optional changelog description (auto-filled from CHANGELOG.md or commits if empty)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -55,6 +59,9 @@ jobs:
                 -dname "CN=Android Debug,O=Android,C=US"
             fi
           fi
+
+      - name: Verify CI changelog generator
+        run: python3 -m unittest discover -s .github/scripts -p "test_*.py" -v
 
       - name: Run Robolectric unit & UI tests
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
@@ -153,10 +160,26 @@ jobs:
           APK_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           cp "$APK_SRC" "release-artifacts/Glassbon-${TAG}-release.apk"
 
+      - name: Generate release notes (auto-fills empty changelog entries)
+        env:
+          MANUAL_RELEASE_NOTES: ${{ inputs.release_notes }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 .github/scripts/generate_changelog.py \
+            --tag "$RELEASE_TAG" \
+            --changelog CHANGELOG.md \
+            --manual-notes "$MANUAL_RELEASE_NOTES" \
+            --output release-artifacts/RELEASE_NOTES.md \
+            --fill-changelog
+          test -s release-artifacts/RELEASE_NOTES.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Glassbon ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
-          files: release-artifacts/*.apk
+          body_path: release-artifacts/RELEASE_NOTES.md
+          generate_release_notes: false
+          files: |
+            release-artifacts/*.apk
+            release-artifacts/RELEASE_NOTES.md

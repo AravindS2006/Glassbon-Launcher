@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -160,6 +161,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   private val wallpaperState = MutableStateFlow(
     ProcessedWallpaper(homeBitmap = null, drawerBlurredBitmap = null, isTopBright = true)
   )
+  private val userManuallyUnlinkedLockApp = MutableStateFlow(false)
+  private var knownInstalledComponentKeys: Set<String> = emptySet()
 
   private val _drawerJumpEvents = MutableSharedFlow<String>(
     extraBufferCapacity = 8,
@@ -177,8 +180,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   private val derivedAppsFlow = combine(
     appRepository.apps,
     appRepository.isLoading,
-    preferencesRepository.preferences
-  ) { allApps, loading, prefs ->
+    preferencesRepository.preferences,
+    userManuallyUnlinkedLockApp
+  ) { allApps, loading, prefs, manuallyUnlinked ->
     val appByKey = allApps.associateBy { it.componentKey }
     val hiddenSet = prefs.hiddenKeys
     val visibleApps = allApps.filterNot { it.componentKey in hiddenSet }
@@ -218,7 +222,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       }
     }
 
-    val linkedLockApp = LockScreenAppHelper.resolveLinkedApp(prefs.lockAppComponentKey, allApps)
+    val linkedLockApp = if (loading) {
+      null
+    } else {
+      LockScreenAppHelper.resolveLinkedApp(prefs.lockAppComponentKey, allApps)
+        ?: if (!manuallyUnlinked) LockScreenAppHelper.pickAutoLinkCandidate(allApps) else null
+    }
     val suggestedLockApps = LockScreenAppHelper.findSuggestedLockApps(allApps)
 
     DerivedAppsBundle(
@@ -309,7 +318,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
           )
         }
         .distinctUntilChanged()
-        .collect { key ->
+        .collectLatest { key ->
           val processed = wallpaperProcessor.loadProcessedWallpaper(
             customPath = key.path,
             grayscale = key.grayscale,
@@ -320,8 +329,52 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // Auto-detect & persist Lock Screen app on startup and whenever packages are installed/uninstalled
+    viewModelScope.launch {
+      combine(
+        appRepository.apps,
+        appRepository.isLoading,
+        preferencesRepository.preferences
+          .map { it.lockAppComponentKey }
+          .distinctUntilChanged(),
+        userManuallyUnlinkedLockApp
+      ) { allApps, loading, persistedKey, manuallyUnlinked ->
+        LockAppSyncInput(allApps, loading, persistedKey, manuallyUnlinked)
+      }.collect { (allApps, loading, persistedKey, manuallyUnlinked) ->
+        if (loading) return@collect
+
+        val currentKeys = allApps.map { it.componentKey }.toSet()
+        val newlyInstalled = if (knownInstalledComponentKeys.isEmpty()) {
+          emptyList()
+        } else {
+          allApps.filter { it.componentKey !in knownInstalledComponentKeys }
+        }
+        knownInstalledComponentKeys = currentKeys
+
+        var effectivelyUnlinked = manuallyUnlinked
+        if (effectivelyUnlinked && newlyInstalled.isNotEmpty() &&
+          LockScreenAppHelper.pickAutoLinkCandidate(newlyInstalled) != null
+        ) {
+          effectivelyUnlinked = false
+          userManuallyUnlinkedLockApp.value = false
+        }
+
+        val resolvedExplicit = LockScreenAppHelper.resolveLinkedApp(persistedKey, allApps)
+        if (persistedKey != null && resolvedExplicit == null) {
+          // Previously linked Lock Screen app was uninstalled: seamlessly relink another or fall back to Settings
+          val replacement = LockScreenAppHelper.pickAutoLinkCandidate(allApps)
+          preferencesRepository.setLockAppComponentKey(replacement?.componentKey)
+        } else if (persistedKey == null && !effectivelyUnlinked) {
+          val candidate = LockScreenAppHelper.pickAutoLinkCandidate(allApps)
+          if (candidate != null) {
+            preferencesRepository.setLockAppComponentKey(candidate.componentKey)
+          }
+        }
+      }
+    }
+
     // One-shot background prewarm of app icons in Ultra-Smooth mode so App Drawer opens & scrolls at 60-120 FPS;
-    // skipped in Low Power mode to avoid background CPU/RAM work.
+    // in Low Power mode, shrink cache cap and skip background CPU/RAM prewarm completely.
     viewModelScope.launch {
       combine(
         appRepository.apps,
@@ -330,12 +383,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
           .distinctUntilChanged()
       ) { apps, (style, powerSaver) -> Triple(apps, style, powerSaver) }
         .collect { (apps, style, powerSaver) ->
+          iconCache.setLowMemoryCap(powerSaver)
           if (!powerSaver && apps.isNotEmpty()) {
             iconCache.prewarm(apps, style)
           }
         }
     }
   }
+
+  private data class LockAppSyncInput(
+    val allApps: List<AppInfo>,
+    val loading: Boolean,
+    val persistedKey: String?,
+    val manuallyUnlinked: Boolean
+  )
 
   private data class WallpaperKey(
     val path: String?,
@@ -373,6 +434,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onAppStart() {
     mediaRepository.startObserving()
+    appRepository.refreshIfNeeded()
     refreshSystemStatus()
   }
 
@@ -460,7 +522,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onHomePowerButtonTap(context: Context = appContext) {
     when (uiState.value.preferences.quickActionMode) {
-      QuickActionMode.LOCK_SCREEN -> triggerScreenLock(context)
+      QuickActionMode.LOCK_SCREEN -> {
+        if (uiState.value.linkedLockApp != null) {
+          triggerScreenLock(context)
+        } else {
+          // Adaptive fallback when no Android Lock Screen app is detected/linked: open Glassbon Preferences
+          openOverlay(LauncherOverlay.SETTINGS)
+        }
+      }
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
@@ -485,7 +554,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       return
     }
 
-    val autoCandidate = LockScreenAppHelper.pickAutoLinkCandidate(state.allApps)
+    val autoCandidate = if (!userManuallyUnlinkedLockApp.value) {
+      LockScreenAppHelper.pickAutoLinkCandidate(state.allApps)
+    } else {
+      null
+    }
     if (autoCandidate != null && appRepository.launchApp(autoCandidate, context)) {
       viewModelScope.launch {
         preferencesRepository.setLockAppComponentKey(autoCandidate.componentKey)
@@ -527,6 +600,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun selectLockScreenApp(app: AppInfo, context: Context = appContext) {
     val shouldLaunch = transientState.value.launchLockAppAfterPick
+    userManuallyUnlinkedLockApp.value = false
     transientState.update {
       it.copy(
         showLockAppPickerDialog = false,
@@ -551,11 +625,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun clearLockScreenApp() {
+    userManuallyUnlinkedLockApp.value = true
     transientState.update {
       it.copy(
         showLockAppPickerDialog = false,
         launchLockAppAfterPick = false,
-        statusMessage = "Lock Screen app link cleared"
+        statusMessage = "Lock app unlinked — bottom button now opens Preferences"
       )
     }
     viewModelScope.launch {
@@ -587,6 +662,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update {
       it.copy(showQuickActions = show, contextMenuApp = null)
     }
+    if (show && !uiState.value.preferences.quickActionsDiscovered) {
+      markQuickActionsDiscovered()
+    }
   }
 
   fun openOverlay(overlay: LauncherOverlay) {
@@ -596,6 +674,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         showQuickActions = false,
         contextMenuApp = null
       )
+    }
+    if (overlay == LauncherOverlay.SETTINGS && !uiState.value.preferences.quickActionsDiscovered) {
+      markQuickActionsDiscovered()
+    }
+  }
+
+  fun dismissQuickActionsHint() {
+    markQuickActionsDiscovered()
+  }
+
+  private fun markQuickActionsDiscovered() {
+    viewModelScope.launch {
+      preferencesRepository.setQuickActionsDiscovered(true)
     }
   }
 

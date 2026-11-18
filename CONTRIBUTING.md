@@ -11,7 +11,7 @@ Thank you for helping make **Glassbon** faster, cleaner, and more intentional. G
    - Use event-driven Android system broadcasts (`ACTION_TIME_TICK`, `ACTION_PACKAGE_*`) and unregister listeners in `onStop()` / `onCleared()`.
 2. **Smooth 60–120 FPS Rendering**
    - Evaluate transient animations strictly inside `Modifier.graphicsLayer { ... }` or `Modifier.offset { ... }` lambdas so scrolling and scrubbing avoid full-tree recompositions.
-   - Do **not** introduce per-frame live `RenderEffect` / software blur shaders over scrolling `LazyColumn` lists; use cached static pre-blurred bitmaps in `WallpaperProcessor`.
+   - Never stack per-row `RenderEffect` blur shaders on individual `LazyColumn` items; keep any drawer focus `BlurEffect` single-layer, bounded, bypassed during active scroll/scrub, and disabled in **Low Power** mode alongside static `WallpaperProcessor` pre-blurs.
    - When implementing hidden edge controls (`invisibleMode = true`), skip composing or drawing child elements while idle.
 3. **Architecture & Kotlin Style**
    - Follow **Kotlin + Jetpack Compose + Material 3 + MVVM** (`StateFlow` + `collectAsStateWithLifecycle`).

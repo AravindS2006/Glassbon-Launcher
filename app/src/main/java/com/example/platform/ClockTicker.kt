@@ -62,17 +62,40 @@ fun rememberSystemClockSnapshot(): ClockSnapshot {
       addAction(Intent.ACTION_TIMEZONE_CHANGED)
       addAction(Intent.ACTION_LOCALE_CHANGED)
     }
-    ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+
+    var receiverRegistered = false
+    fun registerTickReceiver() {
+      if (!receiverRegistered) {
+        receiverRegistered = true
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+      }
+    }
+    fun unregisterTickReceiver() {
+      if (receiverRegistered) {
+        receiverRegistered = false
+        runCatching { context.unregisterReceiver(receiver) }
+      }
+    }
+
+    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+      registerTickReceiver()
+    }
 
     val lifecycleObserver = LifecycleEventObserver { _, event ->
-      if (event == Lifecycle.Event.ON_RESUME) {
-        refresh()
+      when (event) {
+        Lifecycle.Event.ON_START -> {
+          registerTickReceiver()
+          refresh()
+        }
+        Lifecycle.Event.ON_RESUME -> refresh()
+        Lifecycle.Event.ON_STOP -> unregisterTickReceiver()
+        else -> Unit
       }
     }
     lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
     onDispose {
-      runCatching { context.unregisterReceiver(receiver) }
+      unregisterTickReceiver()
       lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
     }
   }

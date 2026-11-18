@@ -1,16 +1,15 @@
 package com.example.ui.drawer
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.getValue
+import android.os.Build
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
@@ -24,72 +23,98 @@ var SemanticsPropertyReceiver.drawerFocusBlurRadiusDp by DrawerFocusBlurRadiusKe
 val DrawerFocusAlphaKey = SemanticsPropertyKey<Float>("DrawerFocusAlpha")
 var SemanticsPropertyReceiver.drawerFocusAlpha by DrawerFocusAlphaKey
 
+private val LeftCenterTransformOrigin = TransformOrigin(0f, 0.5f)
+
 /**
- * Applies an atmospheric frosted depth-of-field effect to non-focused alphabet sections
- * while keeping the centered section crisp and luminous.
- *
- * On Android 12+ (API 31+) with standard effects enabled, combines GPU RenderEffect blur
- * ([BlurredEdgeTreatment.Unbounded]) with depth alpha and subtle scale recession; falls back
- * gracefully to clean optical fade + scale in Low-Effects mode or older Android releases.
+ * Allocates at most one reusable bounded [BlurEffect] for the entire App Drawer so scrolling and
+ * alphabet scrubbing never regenerate GPU Gaussian blur kernels or reallocate unbounded FBOs.
  */
-fun Modifier.drawerFocusSpotlight(
-  isBlurActive: Boolean,
-  isInFocusedSection: Boolean,
+@Composable
+fun rememberCachedAlphabetBlurEffect(
   blurPreset: AlphabetFocusBlur,
-  reducedMotion: Boolean,
   lowEffectsMode: Boolean
-): Modifier = composed {
-  val targetBlurAmount = if (isBlurActive && !isInFocusedSection && blurPreset != AlphabetFocusBlur.OFF) {
-    1f
-  } else {
-    0f
-  }
-
-  val blurProgress by animateFloatAsState(
-    targetValue = targetBlurAmount,
-    animationSpec = if (reducedMotion) {
-      snap()
+): RenderEffect? {
+  val density = LocalDensity.current
+  return remember(blurPreset, lowEffectsMode, density) {
+    if (
+      lowEffectsMode ||
+      blurPreset == AlphabetFocusBlur.OFF ||
+      Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+    ) {
+      null
     } else {
-      tween(durationMillis = 190, easing = FastOutSlowInEasing)
-    },
-    label = "drawer_focus_blur_progress"
-  )
-
-  val targetAlpha = if (blurProgress <= 0.001f) {
-    1f
-  } else {
-    lerp(1f, blurPreset.dimAlpha, blurProgress)
-  }
-  val targetScale = if (blurProgress <= 0.001f) {
-    1f
-  } else {
-    lerp(1f, blurPreset.scaleFactor, blurProgress)
-  }
-  val blurRadiusDp = if (!lowEffectsMode && blurProgress > 0.01f) {
-    blurPreset.blurRadiusDp * blurProgress
-  } else {
-    0f
-  }
-
-  this
-    .then(
-      if (blurRadiusDp > 0.1f) {
-        Modifier.blur(
-          radius = blurRadiusDp.dp,
-          edgeTreatment = BlurredEdgeTreatment.Unbounded
+      val radiusPx = with(density) { blurPreset.blurRadiusDp.dp.toPx() }
+      if (radiusPx > 0.5f) {
+        BlurEffect(
+          radiusX = radiusPx,
+          radiusY = radiusPx,
+          edgeTreatment = TileMode.Clamp
         )
       } else {
-        Modifier
+        null
       }
-    )
-    .graphicsLayer {
-      alpha = targetAlpha
-      scaleX = targetScale
-      scaleY = targetScale
-      transformOrigin = TransformOrigin(0f, 0.5f)
     }
-    .semantics {
-      drawerFocusBlurRadiusDp = blurRadiusDp
-      drawerFocusAlpha = targetAlpha
-    }
+  }
 }
+
+/**
+ * Stateless, zero-recomposition GPU modifier that keeps the centered alphabet section crisp and
+ * subtly recedes neighboring sections.
+ *
+ * State reads happen exclusively inside [graphicsLayer] and [semantics]:
+ * - During active touch scrub or scroll ([isMovingProvider] == true), Gaussian blur FBO passes
+ *   are bypassed so the list slides at native 60-120Hz with zero Skia/HWUI stall.
+ * - Once settled in standard mode, attaches the single drawer-wide [cachedBlurEffect].
+ * - In Low Power / Low-Effects mode, [cachedBlurEffect] is null so zero offscreen blur FBOs
+ *   are ever allocated.
+ */
+fun Modifier.drawerFocusSpotlight(
+  rowSectionKey: String,
+  focusedSectionProvider: () -> String?,
+  focusBlendProvider: () -> Float,
+  isMovingProvider: () -> Boolean,
+  blurPreset: AlphabetFocusBlur,
+  lowEffectsMode: Boolean,
+  cachedBlurEffect: RenderEffect?
+): Modifier = this
+  .graphicsLayer {
+    val focusedSection = focusedSectionProvider()
+    val isNonFocused =
+      focusedSection != null &&
+        blurPreset != AlphabetFocusBlur.OFF &&
+        rowSectionKey != focusedSection
+    val blend = if (isNonFocused) focusBlendProvider().coerceIn(0f, 1f) else 0f
+
+    alpha = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, blend)
+    val scale = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.scaleFactor, blend)
+    scaleX = scale
+    scaleY = scale
+    transformOrigin = LeftCenterTransformOrigin
+
+    val applyBlur =
+      !lowEffectsMode &&
+        !isMovingProvider() &&
+        cachedBlurEffect != null &&
+        isNonFocused &&
+        blend >= 0.72f
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      renderEffect = if (applyBlur) cachedBlurEffect else null
+    }
+  }
+  .semantics {
+    val focusedSection = focusedSectionProvider()
+    val isNonFocused =
+      focusedSection != null &&
+        blurPreset != AlphabetFocusBlur.OFF &&
+        rowSectionKey != focusedSection
+    val blend = if (isNonFocused) focusBlendProvider().coerceIn(0f, 1f) else 0f
+    val applyBlur =
+      !lowEffectsMode &&
+        !isMovingProvider() &&
+        isNonFocused &&
+        blurPreset != AlphabetFocusBlur.OFF &&
+        blend >= 0.72f
+
+    drawerFocusBlurRadiusDp = if (applyBlur) blurPreset.blurRadiusDp else 0f
+    drawerFocusAlpha = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, blend)
+  }

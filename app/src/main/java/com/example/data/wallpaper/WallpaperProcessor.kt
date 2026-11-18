@@ -77,7 +77,8 @@ class WallpaperProcessor(private val context: Context) {
       }
     }
 
-    val sourceBitmap = loadSourceBitmap(customPath, maxDimension = 1280)
+    val targetMaxDim = if (lowEffectsMode) 960 else 1280
+    val sourceBitmap = loadSourceBitmap(customPath, maxDimension = targetMaxDim)
       ?: return@withContext ProcessedWallpaper(null, null, isTopBright = true)
 
     val processedHome = renderOptimizedHomeBitmap(sourceBitmap, grayscale)
@@ -88,7 +89,7 @@ class WallpaperProcessor(private val context: Context) {
     val regions = computeRegionLuminance(processedHome)
 
     val drawerBitmap = if (lowEffectsMode || blurIntensity <= 0.05f) {
-      processedHome
+      null
     } else {
       val blurRadius = (5 + (blurIntensity * 13f)).toInt().coerceIn(4, 18)
       createBlurredVariant(processedHome, blurRadius)
@@ -96,7 +97,7 @@ class WallpaperProcessor(private val context: Context) {
 
     val result = ProcessedWallpaper(
       homeBitmap = processedHome.asImageBitmap(),
-      drawerBlurredBitmap = drawerBitmap.asImageBitmap(),
+      drawerBlurredBitmap = drawerBitmap?.asImageBitmap(),
       isTopBright = regions.isTopBright,
       isMiddleBright = regions.isMiddleBright,
       isEdgesBright = regions.isEdgesBright

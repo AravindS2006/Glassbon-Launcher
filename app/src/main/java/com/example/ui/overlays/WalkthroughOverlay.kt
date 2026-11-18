@@ -93,7 +93,7 @@ private val WALKTHROUGH_STEPS = listOf(
     badge = "Atmosphere & Efficiency",
     title = "Pure Calm, Zero Battery Drain",
     description = "Glassbon caches pre-scaled wallpapers and frosted drawer layers off the main thread so your Home screen stays featherlight with zero background polling.",
-    tip = "Static frosted surfaces replace expensive live blur shaders.",
+    tip = "Tip: Press & hold the bottom-right button anytime to open Preferences & Quick Actions.",
     icon = Icons.Outlined.BatteryChargingFull,
     anchor = SpatialAnchor.CENTER
   ),
@@ -131,9 +131,9 @@ private val WALKTHROUGH_STEPS = listOf(
   ),
   WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "Lock Screen App & Quick Actions",
-    description = "Tap the bottom-right glass button to launch your linked Android Lock Screen app with sculpted haptic feedback—or press and hold anytime for Quick Actions.",
-    tip = "Auto-detects your Lock Screen app or lets you pick any lock utility inside Preferences.",
+    title = "Adaptive Power & Preferences",
+    description = "Tap the bottom-right button to launch your auto-detected Lock Screen app—or open Glassbon Preferences directly if no Lock app is installed. Press & hold anytime for Quick Actions.",
+    tip = "Automatically links installed Lock Screen apps and adapts the icon in real time.",
     icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
@@ -520,7 +520,7 @@ private fun SpatialAnchorBeacons(anchor: SpatialAnchor) {
 
       SpatialAnchor.BOTTOM_RIGHT -> {
         SpatialBeaconPill(
-          label = "Lock Button · Hold for Actions",
+          label = "Power / Preferences · Hold for Actions",
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 22.dp, bottom = 78.dp)

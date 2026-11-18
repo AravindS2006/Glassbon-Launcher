@@ -50,10 +50,13 @@
 - **Compact Frosted Squircles & Pop-Up App Preview**
   - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights and corner-sampled background suppression.
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
+  - **Drawer Alphabet Centering & Focus Blur (`Off` / `Soft` / `Frosted` / `Deep`)**: Selecting or scrubbing an alphabet centers its apps vertically while subtly blurring non-selected sections via a single drawer-cached bounded `BlurEffect` that automatically bypasses blur while actively scrolling or scrubbing for silky 60–120 FPS motion.
 - **Smart Audio Media Capsule**
   - Automatically expands beneath Clock/Date using zero-permission `AudioManager` hardware media key events (`KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` / `PREVIOUS`) while audio plays, then collapses cleanly when idle.
-- **Linked Lock Screen App, Sculpted Haptics & Zero Manifest Permissions**
-  - Tap the bottom-right glass lock button to launch your **linked Android Lock Screen app** (auto-detects OEM or Play Store lock screen / screen-off utilities, or lets you link any app once via a frosted searchable picker and change it anytime in **Preferences → Linked Lock Screen App**). Press and hold for **Quick Actions**, **Wallpaper Studio**, **Home Shortcuts**, **Preferences** (**Ultra-Smooth** vs. **Low Power**), **Screen Lock Settings**, and the **Guided Feature Tour**.
+- **Adaptive Lock Screen & Preferences Control, Sculpted Haptics & Zero Manifest Permissions**
+  - **Auto-Detection & Adaptive Fallback**: During startup, foreground resume, and package install/uninstall events, Glassbon automatically detects installed OEM or Play Store Android Lock Screen utilities (`LockScreenAppHelper`). When linked, the bottom-right button shows a **Power (`⏻`)** icon that launches your Lock app; if no Lock app is installed on the device, it seamlessly transforms into a **Settings (`⚙`)** icon so tapping opens **Glassbon Preferences** directly.
+  - **Tour-Skip Friendly Discovery**: Users who skip the guided tour still see a self-dismissing frosted `"Hold ⏻ for Preferences"` callout above the Power button until Quick Actions or Preferences are opened.
+  - **Performance Modes (`Ultra-Smooth` vs. `Low Power`)**: Switch between full prewarmed icons, 120Hz springs & frosted drawer blur, or **Low Power** mode which halves bitmap decode cost, skips icon prewarming, shrinks cache allocations, snaps transitions, and disables blur shaders for near-zero battery & CPU impact.
   - **Sculpted Tactile Haptics (`MistHaptics`)**: Zero-permission `HapticFeedbackConstants` cues with **Subtle**, **Balanced**, and **Crisp** profiles across curved wave detents, drawer swipe-down return, context pop-ups, and app launches.
   - Ships with **zero `<uses-permission>` declarations** — no `WRITE_SETTINGS`, `INTERNET`, `VIBRATE`, `BIND_ACCESSIBILITY_SERVICE`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`, `REQUEST_DELETE_PACKAGES`, SMS, or broad storage permissions.
 
@@ -67,10 +70,10 @@
 
 | Subsystem | Zero-Overhead Technique | Battery & Performance Impact |
 | :--- | :--- | :--- |
-| **Wallpaper & Blur** | Static `RGB_565` downscaled bitmaps + one-time `RenderEffect` / downsampled drawer pre-blur | Zero per-frame shader overhead |
+| **Wallpaper & Blur** | Static `RGB_565` downscaled bitmaps + scroll-bypassed single `BlurEffect` (zeroed in **Low Power**) | Zero per-frame blur recomposition overhead |
 | **Luminance Contrast** | Single `12×12` pixel grid sample on `Dispatchers.IO` upon wallpaper change | Cached boolean flags; zero runtime polling |
 | **Hidden Left Wave** | Transparent `30.dp` touch strip at rest; 28-letter Gaussian arc composes only during drag | `0%` idle CPU/GPU composition cost |
-| **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; respects **Reduced Motion** |
+| **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; snapped in **Low Power** / **Reduced Motion** |
 | **Clock & Media** | Event-driven `ACTION_TIME_TICK` & `AudioManager` media keys bound to `onStart`/`onStop` | Zero background loops, listeners, or timers |
 
 ---
@@ -84,7 +87,7 @@ Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOv
 3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
 4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
 5. **Smart Audio Media Capsule** — Space-reclaiming zero-permission playback card.
-6. **Lock Screen App & Quick Actions** — Bottom-right control that launches your linked Android Lock Screen app with sculpted haptic feedback, or opens Quick Actions on hold.
+6. **Adaptive Power & Preferences** — Bottom-right control that launches your auto-detected Android Lock Screen app with sculpted haptic feedback (or opens Preferences directly when none is installed), and opens Quick Actions on hold.
 
 Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
 
@@ -106,7 +109,7 @@ gradle :app:testDebugUnitTest --no-daemon
 
 This repository includes `.github/workflows/android-release.yml`:
 - **Push / Pull Request to `main`**: Runs `:app:testDebugUnitTest` and uploads `Glassbon-debug-apk` as a workflow artifact.
-- **Version Tag (`v*`) or Manual Dispatch**: Dynamically derives both `versionName` and `versionCode` from the pushed Git/GitHub release tag (e.g. `v1.2.3` → `1.2.3`, `versionCode = 10203`), builds the APK, and publishes a GitHub Release with the APK attached.
+- **Version Tag (`v*`) or Manual Dispatch**: Dynamically derives both `versionName` and `versionCode` from the pushed Git/GitHub release tag (e.g. `v1.2.3` → `1.2.3`, `versionCode = 10203`), builds an R8-minified release APK, auto-populates changelog descriptions via `.github/scripts/generate_changelog.py` whenever release notes or `CHANGELOG.md` entries are left empty, and publishes the GitHub Release with APK + `RELEASE_NOTES.md` attached.
 
 ```bash
 git tag v1.0.0

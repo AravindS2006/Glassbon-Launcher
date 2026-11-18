@@ -2,6 +2,14 @@
 
 All notable changes to **Glassbon Launcher** are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Auto-Detected Lock Screen App & Adaptive Preferences Button**: Automatically links installed OEM or third-party Lock Screen apps (`LockScreenAppHelper`) on startup, foreground resume, and after package install/uninstall (`ACTION_PACKAGE_ADDED`/`REMOVED`). When no Lock app is present, the bottom-right Power icon switches to a **Settings** icon that opens **Glassbon Preferences** directly.
+- **Tour-Skip Discovery Callout**: Added an unmistakable long-press tip to Tour Step 1, onboarding copy, and a self-dismissing frosted `"Hold ⏻ for Preferences"` hint pill above the Power button until Quick Actions or Preferences are opened.
+- **Alphabet Focus Blur & Zero-Battery Performance Modes**: Centered drawer jumps blur non-selected sections via a single drawer-cached bounded `BlurEffect` that automatically bypasses during active scroll/scrub; **Low Power** mode eliminates pre-blur decode, icon prewarming, animations, and shrinks cache allocations for minimal battery/CPU footprint.
+- **CI Auto-Changelog Generation**: Added `.github/scripts/generate_changelog.py` to `.github/workflows/android-release.yml` so GitHub Releases and empty changelog entries are automatically populated from `[Unreleased]`, conventional commits, or fallback highlights whenever manual notes are omitted.
+
 ## [1.0.0] - 2026-11-17
 
 ### Added

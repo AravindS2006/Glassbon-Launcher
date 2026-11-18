@@ -55,6 +55,18 @@ class LockScreenAppHelperTest {
   }
 
   @Test
+  fun `auto candidate links lockscreen package utilities but does not auto-link ambiguous app lockers`() {
+    val vault = fakeApp("com.example.vault", "App Locker")
+    assertEquals(45, LockScreenAppHelper.scoreCandidate(vault))
+    assertEquals(listOf(vault), LockScreenAppHelper.findSuggestedLockApps(listOf(vault)))
+    assertNull(LockScreenAppHelper.pickAutoLinkCandidate(listOf(vault)))
+
+    val screenOff = fakeApp("com.example.lockscreenapp", "Touch Lock")
+    assertEquals(80, LockScreenAppHelper.scoreCandidate(screenOff))
+    assertEquals(screenOff, LockScreenAppHelper.pickAutoLinkCandidate(listOf(vault, screenOff)))
+  }
+
+  @Test
   fun `mist haptics resolves tactile profiles cleanly`() {
     assertNull(MistHaptics.resolveHapticConstant(MistHapticEvent.TAP_LIGHT, HapticProfile.SUBTLE))
     assertNull(MistHaptics.resolveHapticConstant(MistHapticEvent.WAVE_RELEASE, HapticProfile.SUBTLE))

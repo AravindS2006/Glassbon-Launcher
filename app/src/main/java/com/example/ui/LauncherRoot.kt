@@ -2,8 +2,11 @@ package com.example.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -140,19 +143,18 @@ fun LauncherRoot(
     }
   }
 
-  val transitionDurationMs = when {
-    prefs.effectiveReducedMotion -> 0
-    uiState.isDrawerOpen -> 220
-    else -> 180
-  }
-
   // Read drawerProgressState.value ONLY inside derivedStateOf and graphicsLayer lambdas (0 per-frame recompositions!)
   val drawerProgressState = animateFloatAsState(
     targetValue = if (uiState.isDrawerOpen) 1f else 0f,
-    animationSpec = tween(
-      durationMillis = transitionDurationMs,
-      easing = FastOutSlowInEasing
-    ),
+    animationSpec = if (prefs.effectiveReducedMotion) {
+      snap()
+    } else {
+      spring(
+        dampingRatio = 0.92f,
+        stiffness = 480f,
+        visibilityThreshold = 0.002f
+      )
+    },
     label = "drawer_progress"
   )
 
@@ -246,7 +248,7 @@ fun LauncherRoot(
         modifier = Modifier.graphicsLayer {
           val p = drawerProgressState.value
           alpha = p
-          translationY = (1f - p) * 28f
+          translationY = (1f - p) * 56f
         }
       )
     }
@@ -289,7 +291,8 @@ fun LauncherRoot(
         onOpenActiveMediaPlayer = { viewModel.openActiveMediaPlayer() },
         onRequestDefaultHome = onRequestDefaultHome,
         onStartTour = { viewModel.startWalkthrough() },
-        onDismissOnboarding = { viewModel.dismissOnboarding() }
+        onDismissOnboarding = { viewModel.dismissOnboarding() },
+        onDismissQuickActionsHint = { viewModel.dismissQuickActionsHint() }
       )
     }
 
@@ -466,8 +469,8 @@ fun LauncherRoot(
     // 9. Transient status pill
     AnimatedVisibility(
       visible = uiState.statusMessage != null,
-      enter = fadeIn(tween(150)),
-      exit = fadeOut(tween(150)),
+      enter = if (prefs.effectiveReducedMotion) EnterTransition.None else fadeIn(tween(150)),
+      exit = if (prefs.effectiveReducedMotion) ExitTransition.None else fadeOut(tween(150)),
       modifier = Modifier
         .align(Alignment.BottomCenter)
         .navigationBarsPadding()

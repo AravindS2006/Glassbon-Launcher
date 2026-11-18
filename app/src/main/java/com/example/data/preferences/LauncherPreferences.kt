@@ -51,9 +51,9 @@ enum class AlphabetFocusBlur(
   val scaleFactor: Float
 ) {
   OFF("Off", 0f, 1f, 1f),
-  SOFT("Soft Mist", 5f, 0.50f, 0.98f),
-  FROSTED("Frosted Lens", 11f, 0.30f, 0.955f),
-  DEEP("Deep Bokeh", 18f, 0.18f, 0.935f)
+  SOFT("Soft Mist", 5f, 0.52f, 0.98f),
+  FROSTED("Frosted Lens", 9f, 0.34f, 0.96f),
+  DEEP("Deep Bokeh", 14f, 0.22f, 0.94f)
 }
 
 @Immutable
@@ -86,6 +86,7 @@ data class LauncherPreferences(
   val lockAppComponentKey: String? = null,
   val onboardingDismissed: Boolean = false,
   val walkthroughCompleted: Boolean = false,
+  val quickActionsDiscovered: Boolean = false,
   val favoritesSeeded: Boolean = false
 ) {
   val isPowerSaver: Boolean

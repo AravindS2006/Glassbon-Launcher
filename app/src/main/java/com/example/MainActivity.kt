@@ -18,7 +18,14 @@ import com.example.ui.theme.MistLauncherTheme
 
 class MainActivity : ComponentActivity() {
 
-  private val viewModel: LauncherViewModel by viewModels()
+  private val viewModel: LauncherViewModel by viewModels {
+    object : androidx.lifecycle.ViewModelProvider.Factory {
+      @Suppress("UNCHECKED_CAST")
+      override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+        return LauncherViewModel(application) as T
+      }
+    }
+  }
 
   private val requestHomeRoleLauncher = registerForActivityResult(
     ActivityResultContracts.StartActivityForResult()

@@ -2,7 +2,10 @@ package com.example.ui.drawer
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -72,6 +75,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -192,7 +196,8 @@ fun AppDrawerScreen(
     }
   }
 
-  val currentIsScrubbing by rememberUpdatedState(isScrubbingAnyEdge)
+  val currentIsScrubbingState = rememberUpdatedState(isScrubbingAnyEdge)
+  val currentIsScrubbing by currentIsScrubbingState
   val currentIsSearchActive by rememberUpdatedState(uiState.isSearchActive)
   val currentReducedMotion by rememberUpdatedState(effectiveReducedMotion)
   val currentOnCloseDrawer by rememberUpdatedState(onCloseDrawer)
@@ -318,7 +323,7 @@ fun AppDrawerScreen(
           drawerScrubPullState.floatValue
         }
         baseLeftClearancePx + extraLeftClearancePx * pull
-      }.collect { targetShift ->
+      }.collectLatest { targetShift ->
         listDragShiftX.animateTo(
           targetValue = targetShift,
           animationSpec = spring(
@@ -343,13 +348,48 @@ fun AppDrawerScreen(
   val sectionIndexMap = uiState.sectionIndexMap
   val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
 
-  var pinnedJumpKey by remember { mutableStateOf<String?>(null) }
+  val pinnedJumpKeyState = remember { mutableStateOf<String?>(null) }
   val targetContinuousRowState = remember { mutableFloatStateOf(-1f) }
   val targetScrubSectionState = remember { mutableStateOf<String?>(null) }
+  val focusBlend = remember { Animatable(0f) }
+  val cachedBlurEffect = rememberCachedAlphabetBlurEffect(
+    blurPreset = prefs.alphabetFocusBlur,
+    lowEffectsMode = effectiveLowEffects
+  )
+  val focusedSectionProvider: () -> String? = remember(pinnedJumpKeyState, prefs.alphabetFocusBlur) {
+    {
+      if (prefs.alphabetFocusBlur == AlphabetFocusBlur.OFF) null else pinnedJumpKeyState.value
+    }
+  }
+  val focusBlendProvider: () -> Float = remember(focusBlend) { { focusBlend.value } }
+  val isSpotlightMotionProvider: () -> Boolean = remember(listState, targetContinuousRowState, currentIsScrubbingState) {
+    {
+      currentIsScrubbingState.value ||
+        listState.isScrollInProgress ||
+        targetContinuousRowState.floatValue >= 0f
+    }
+  }
+
+  LaunchedEffect(prefs.alphabetFocusBlur, effectiveReducedMotion) {
+    snapshotFlow { prefs.alphabetFocusBlur != AlphabetFocusBlur.OFF && pinnedJumpKeyState.value != null }
+      .collectLatest { active ->
+        if (effectiveReducedMotion) {
+          focusBlend.snapTo(if (active) 1f else 0f)
+        } else {
+          focusBlend.animateTo(
+            targetValue = if (active) 1f else 0f,
+            animationSpec = tween(
+              durationMillis = if (active) 170 else 140,
+              easing = FastOutSlowInEasing
+            )
+          )
+        }
+      }
+  }
 
   LaunchedEffect(uiState.isDrawerOpen, uiState.isSearchActive) {
     if (!uiState.isDrawerOpen || uiState.isSearchActive) {
-      pinnedJumpKey = null
+      pinnedJumpKeyState.value = null
       targetContinuousRowState.floatValue = -1f
       targetScrubSectionState.value = null
     }
@@ -468,7 +508,7 @@ fun AppDrawerScreen(
     if (uiState.drawerRows.isEmpty() || sectionIndexMap.isEmpty()) return
     val touchedIdx = continuousIdx.toInt().coerceIn(0, entries.lastIndex)
     val resolved = findNearestSection(entries[touchedIdx], sectionIndexMap) ?: return
-    pinnedJumpKey = resolved.first
+    pinnedJumpKeyState.value = resolved.first
     targetScrubSectionState.value = resolved.first
     targetContinuousRowState.floatValue = computeCenteredTarget(resolved.first)?.continuousAnchorPos
       ?: resolved.second.toFloat()
@@ -478,7 +518,7 @@ fun AppDrawerScreen(
   LaunchedEffect(listState) {
     listState.interactionSource.interactions.collect { interaction ->
       if (interaction is DragInteraction.Start) {
-        pinnedJumpKey = null
+        pinnedJumpKeyState.value = null
         targetContinuousRowState.floatValue = -1f
         targetScrubSectionState.value = null
       }
@@ -508,7 +548,7 @@ fun AppDrawerScreen(
           .first { it > 0 }
       }
       if (targetContinuousRowState.floatValue < 0f) {
-        pinnedJumpKey = resolved.first
+        pinnedJumpKeyState.value = resolved.first
         targetContinuousRowState.floatValue = -1f
         targetScrubSectionState.value = null
         scrollToCenteredSection(resolved.first)
@@ -522,7 +562,7 @@ fun AppDrawerScreen(
     drawerJumpEvents.collect { target ->
       val resolved = findNearestSection(target, sectionIndexMap)
       if (resolved != null) {
-        pinnedJumpKey = resolved.first
+        pinnedJumpKeyState.value = resolved.first
         targetContinuousRowState.floatValue = -1f
         targetScrubSectionState.value = null
         scrollToCenteredSection(resolved.first)
@@ -562,6 +602,7 @@ fun AppDrawerScreen(
             val offsetPx = ((clampedTarget - itemIndex) * measuredRowHeightPx(itemIndex)).roundToInt().coerceAtLeast(0)
             listState.scrollToItem(itemIndex, offsetPx)
           }
+          targetContinuousRowState.floatValue = -1f
           return@collectLatest
         }
 
@@ -595,13 +636,14 @@ fun AppDrawerScreen(
         targetScrubSectionState.value?.let { settledKey ->
           scrollToCenteredSection(settledKey)
         }
+        targetContinuousRowState.floatValue = -1f
       }
   }
 
   // Only read inside activeKeyProvider lambda passed to AlphabetRail -> AppDrawerScreen NEVER recomposes while scrolling!
   val activeIndexKeyState = remember(sectionIndexMap) {
     derivedStateOf {
-      val pinned = pinnedJumpKey
+      val pinned = pinnedJumpKeyState.value
       if (pinned != null && pinned in sectionIndexMap) {
         pinned
       } else {
@@ -651,7 +693,13 @@ fun AppDrawerScreen(
     ) {
       AnimatedContent(
         targetState = uiState.isSearchActive,
-        transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(110)) },
+        transitionSpec = {
+          if (effectiveReducedMotion) {
+            EnterTransition.None togetherWith ExitTransition.None
+          } else {
+            fadeIn(tween(140)) togetherWith fadeOut(tween(110))
+          }
+        },
         label = "drawer_header_transition",
         modifier = headerPullModifier
       ) { searching ->
@@ -736,7 +784,6 @@ fun AppDrawerScreen(
           val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
           val isItalic = prefs.typographyStyle == TypographyStyle.SERIF_ITALIC
           val favoritesTitle = stringResource(R.string.favorites_section_title)
-          val activeFocusedSection = pinnedJumpKey?.takeIf { prefs.alphabetFocusBlur != AlphabetFocusBlur.OFF }
 
           LazyColumn(
             state = listState,
@@ -758,14 +805,15 @@ fun AppDrawerScreen(
               key = { it.rowKey },
               contentType = { it.contentType }
             ) { rowItem ->
-              val hasActiveSpotlight = activeFocusedSection != null
-              val isInFocusedSection = !hasActiveSpotlight || rowItem.sectionKey == activeFocusedSection
+              val rowSectionKey = rowItem.sectionKey
               val spotlightModifier = Modifier.drawerFocusSpotlight(
-                isBlurActive = hasActiveSpotlight,
-                isInFocusedSection = isInFocusedSection,
+                rowSectionKey = rowSectionKey,
+                focusedSectionProvider = focusedSectionProvider,
+                focusBlendProvider = focusBlendProvider,
+                isMovingProvider = isSpotlightMotionProvider,
                 blurPreset = prefs.alphabetFocusBlur,
-                reducedMotion = effectiveReducedMotion,
-                lowEffectsMode = effectiveLowEffects
+                lowEffectsMode = effectiveLowEffects,
+                cachedBlurEffect = cachedBlurEffect
               )
 
               when (rowItem) {
@@ -773,7 +821,7 @@ fun AppDrawerScreen(
                   DrawerSectionHeader(
                     title = if (rowItem.isFavoritesHeader) favoritesTitle else rowItem.title,
                     useSans = useSans || rowItem.isFavoritesHeader,
-                    isHighlighted = hasActiveSpotlight && isInFocusedSection,
+                    isHighlightedProvider = { focusedSectionProvider() == rowSectionKey },
                     modifier = spotlightModifier
                       .padding(
                         top = if (rowItem.isFavoritesHeader) 8.dp else 20.dp,
@@ -836,7 +884,7 @@ fun AppDrawerScreen(
                 onSelectKey = { targetKey ->
                   val resolved = findNearestSection(targetKey, sectionIndexMap)
                   if (resolved != null) {
-                    pinnedJumpKey = resolved.first
+                    pinnedJumpKeyState.value = resolved.first
                     targetContinuousRowState.floatValue = -1f
                     targetScrubSectionState.value = null
                     coroutineScope.launch { scrollToCenteredSection(resolved.first) }
@@ -876,7 +924,7 @@ fun AppDrawerScreen(
                 onSelectKey = { targetKey ->
                   val resolved = findNearestSection(targetKey, sectionIndexMap)
                   if (resolved != null) {
-                    pinnedJumpKey = resolved.first
+                    pinnedJumpKeyState.value = resolved.first
                     targetContinuousRowState.floatValue = -1f
                     targetScrubSectionState.value = null
                     coroutineScope.launch { scrollToCenteredSection(resolved.first) }
@@ -897,6 +945,7 @@ fun AppDrawerScreen(
         onClick = { onSearchActiveChange(true) },
         hapticFeedback = prefs.hapticFeedback,
         reducedMotion = effectiveReducedMotion,
+        lowPowerMode = effectiveLowEffects,
         modifier = Modifier
           .align(Alignment.BottomEnd)
           .padding(end = 24.dp, bottom = 20.dp)
@@ -947,28 +996,29 @@ private fun findNearestSection(
 private fun DrawerSectionHeader(
   title: String,
   useSans: Boolean = true,
-  isHighlighted: Boolean = false,
+  isHighlightedProvider: () -> Boolean = { false },
   modifier: Modifier = Modifier
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    modifier = modifier.padding(start = 4.dp)
+    modifier = modifier
+      .padding(start = 4.dp)
+      .drawBehind {
+        if (isHighlightedProvider()) {
+          drawCircle(
+            color = MistColors.PureWhite.copy(alpha = 0.92f),
+            radius = 3.dp.toPx(),
+            center = Offset(x = -9.dp.toPx(), y = size.height / 2f)
+          )
+        }
+      }
   ) {
-    if (isHighlighted) {
-      Box(
-        modifier = Modifier
-          .size(6.dp)
-          .clip(CircleShape)
-          .background(MistColors.PureWhite.copy(alpha = 0.92f))
-      )
-      Spacer(modifier = Modifier.width(8.dp))
-    }
     Text(
       text = title,
       fontFamily = if (useSans) FunctionalSansFontFamily else EditorialDisplayFontFamily,
       fontSize = if (useSans) 16.sp else 19.sp,
-      letterSpacing = if (isHighlighted) 1.0.sp else 0.6.sp,
-      color = if (isHighlighted) MistColors.PureWhite else MistColors.OffWhite.copy(alpha = 0.72f)
+      letterSpacing = 0.7.sp,
+      color = MistColors.PureWhite.copy(alpha = 0.92f)
     )
   }
 }

@@ -85,9 +85,9 @@ object LockScreenAppHelper {
     val scored = allApps
       .mapNotNull { app ->
         val score = scoreCandidate(app)
-        if (score >= 90) app to score else null
+        if (score >= 80) app to score else null
       }
-      .sortedByDescending { it.second }
+      .sortedWith(compareByDescending<Pair<AppInfo, Int>> { it.second }.thenBy { it.first.label.lowercase() })
     return scored.firstOrNull()?.first
   }
 }

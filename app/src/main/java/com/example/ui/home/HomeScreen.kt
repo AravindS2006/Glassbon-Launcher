@@ -1,6 +1,8 @@
 package com.example.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,6 +10,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -24,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -34,9 +38,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -53,6 +60,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,6 +110,7 @@ fun HomeScreen(
   onRequestDefaultHome: () -> Unit,
   onStartTour: () -> Unit,
   onDismissOnboarding: () -> Unit,
+  onDismissQuickActionsHint: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val prefs = uiState.preferences
@@ -167,8 +176,8 @@ fun HomeScreen(
 
       AnimatedVisibility(
         visible = hasActiveMedia,
-        enter = fadeIn() + expandVertically(),
-        exit = fadeOut() + shrinkVertically()
+        enter = if (prefs.effectiveReducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+        exit = if (prefs.effectiveReducedMotion) ExitTransition.None else fadeOut() + shrinkVertically()
       ) {
         Column {
           Spacer(modifier = Modifier.height(14.dp))
@@ -418,22 +427,107 @@ fun HomeScreen(
       }
     }
 
-    // Bottom-right floating glass Lock / Quick Action button (Tap = Configured Action, Long-press = Quick Actions menu)
+    val hasLinkedLockApp = uiState.linkedLockApp != null
+    val isAdaptiveSettingsFallback = prefs.quickActionMode == QuickActionMode.LOCK_SCREEN && !hasLinkedLockApp
+
+    // Self-dismissing frosted tip above Power icon when user skips/dismisses tour before discovering long-press
+    val showPowerHoldHint = !showOnboardingPill &&
+      !uiState.isDrawerOpen &&
+      prefs.quickActionMode == QuickActionMode.LOCK_SCREEN &&
+      hasLinkedLockApp &&
+      !prefs.quickActionsDiscovered
+    if (showPowerHoldHint) {
+      GlassSurface(
+        modifier = Modifier
+          .align(Alignment.BottomEnd)
+          .padding(end = 22.dp, bottom = 64.dp)
+          .graphicsLayer {
+            val p = drawerProgressProvider()
+            alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
+          }
+          .testTag("power_hold_hint_pill"),
+        shape = RoundedCornerShape(14.dp)
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Box(
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier
+              .heightIn(min = 48.dp)
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = MistColors.PureWhite),
+                onClick = {
+                  haptics.trigger(MistHapticEvent.CONFIRM)
+                  onPowerButtonLongPress()
+                }
+              )
+              .padding(start = 14.dp, end = 6.dp)
+              .testTag("power_hold_hint_action")
+          ) {
+            Text(
+              text = stringResource(R.string.power_hold_hint),
+              fontFamily = FunctionalSansFontFamily,
+              fontWeight = FontWeight.Medium,
+              fontSize = 11.5.sp,
+              color = MistColors.OffWhite
+            )
+          }
+          Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+              .size(48.dp)
+              .clip(RoundedCornerShape(10.dp))
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = MistColors.PureWhite),
+                onClick = {
+                  haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                  onDismissQuickActionsHint()
+                }
+              )
+              .testTag("dismiss_power_hint_button")
+          ) {
+            Icon(
+              imageVector = Icons.Rounded.Close,
+              contentDescription = stringResource(R.string.cd_dismiss_hint),
+              tint = MistColors.MistGrey,
+              modifier = Modifier.size(15.dp)
+            )
+          }
+        }
+      }
+    }
+
+    // Bottom-right floating glass button:
+    // - Linked Lock App -> Power icon (Tap = Lock Screen, Hold = Quick Actions)
+    // - No Lock App installed/linked -> Settings gear icon (Tap = Glassbon Preferences, Hold = Quick Actions)
     val quickButtonIcon = when (prefs.quickActionMode) {
-      QuickActionMode.LOCK_SCREEN -> Icons.Rounded.PowerSettingsNew
+      QuickActionMode.LOCK_SCREEN -> {
+        if (hasLinkedLockApp) Icons.Rounded.PowerSettingsNew else Icons.Rounded.Settings
+      }
       QuickActionMode.QUICK_PANEL -> Icons.Rounded.Tune
       QuickActionMode.DIRECT_SEARCH -> Icons.Rounded.Search
       QuickActionMode.DIRECT_LIBRARY -> Icons.Rounded.Apps
       QuickActionMode.LOCK_SETTINGS -> Icons.Outlined.Lock
     }
+    val quickButtonDescription = stringResource(
+      if (isAdaptiveSettingsFallback) {
+        R.string.cd_open_preferences_or_quick_actions
+      } else {
+        R.string.cd_open_quick_actions
+      }
+    )
     FloatingCircleButton(
       icon = quickButtonIcon,
-      contentDescription = stringResource(R.string.cd_open_quick_actions),
+      contentDescription = quickButtonDescription,
       testTag = "home_quick_actions_button",
       onClick = onPowerButtonTap,
       onLongClick = onPowerButtonLongPress,
       hapticFeedback = prefs.hapticFeedback,
       reducedMotion = prefs.effectiveReducedMotion,
+      lowPowerMode = prefs.effectiveLowEffects,
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(end = 22.dp)

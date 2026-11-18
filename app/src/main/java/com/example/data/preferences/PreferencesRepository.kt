@@ -63,6 +63,7 @@ class PreferencesRepository(private val context: Context) {
     val LOCK_APP_COMPONENT_KEY = stringPreferencesKey("lock_app_component_key")
     val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
     val WALKTHROUGH_COMPLETED = booleanPreferencesKey("walkthrough_completed")
+    val QUICK_ACTIONS_DISCOVERED = booleanPreferencesKey("quick_actions_discovered")
     val FAVORITES_SEEDED = booleanPreferencesKey("favorites_seeded")
   }
 
@@ -104,6 +105,7 @@ class PreferencesRepository(private val context: Context) {
       lockAppComponentKey = prefs[Keys.LOCK_APP_COMPONENT_KEY]?.takeIf { it.isNotBlank() },
       onboardingDismissed = prefs[Keys.ONBOARDING_DISMISSED] ?: false,
       walkthroughCompleted = prefs[Keys.WALKTHROUGH_COMPLETED] ?: false,
+      quickActionsDiscovered = prefs[Keys.QUICK_ACTIONS_DISCOVERED] ?: false,
       favoritesSeeded = prefs[Keys.FAVORITES_SEEDED] ?: false
     )
   }
@@ -237,6 +239,15 @@ class PreferencesRepository(private val context: Context) {
 
   suspend fun setWalkthroughCompleted(completed: Boolean) {
     dataStore.edit { it[Keys.WALKTHROUGH_COMPLETED] = completed }
+  }
+
+  suspend fun setQuickActionsDiscovered(discovered: Boolean) {
+    dataStore.edit { it[Keys.QUICK_ACTIONS_DISCOVERED] = discovered }
+  }
+
+  @androidx.annotation.VisibleForTesting
+  internal suspend fun resetAllForTest() {
+    dataStore.edit { it.clear() }
   }
 
   private inline fun <reified T : Enum<T>> parseEnum(raw: String?, fallback: T): T {

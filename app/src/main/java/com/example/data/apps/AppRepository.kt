@@ -86,6 +86,7 @@ class AppRepository(
 
   private var registered = false
   private var refreshJob: kotlinx.coroutines.Job? = null
+  private var lastRefreshElapsedMs: Long = 0L
 
   fun startObserving() {
     if (!registered) {
@@ -124,7 +125,14 @@ class AppRepository(
     runCatching { context.unregisterReceiver(localeReceiver) }
   }
 
+  fun refreshIfNeeded(minIntervalMs: Long = 1_000L) {
+    if (SystemClock.elapsedRealtime() - lastRefreshElapsedMs >= minIntervalMs) {
+      refreshApps()
+    }
+  }
+
   fun refreshApps() {
+    lastRefreshElapsedMs = SystemClock.elapsedRealtime()
     refreshJob?.cancel()
     refreshJob = scope.launch {
       val discovered = queryLaunchableApps()

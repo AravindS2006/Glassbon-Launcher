@@ -298,15 +298,25 @@ fun SettingsScreen(
           DividerLine()
           TogglePreferenceRow(
             title = "Reduced Motion",
-            subtitle = "Minimize transition animations",
-            checked = prefs.reducedMotion,
+            subtitle = if (prefs.isPowerSaver) {
+              "Managed by Low Power mode — transitions snapped"
+            } else {
+              "Minimize transition animations"
+            },
+            checked = prefs.effectiveReducedMotion,
+            enabled = !prefs.isPowerSaver,
             onCheckedChange = onSetReducedMotion
           )
           DividerLine()
           TogglePreferenceRow(
             title = "Low-Effects Mode",
-            subtitle = "Disable wallpaper blur for weaker devices",
-            checked = prefs.lowEffectsMode,
+            subtitle = if (prefs.isPowerSaver) {
+              "Managed by Low Power mode — blur & shaders off"
+            } else {
+              "Disable wallpaper & focus blur for weaker devices"
+            },
+            checked = prefs.effectiveLowEffects,
+            enabled = !prefs.isPowerSaver,
             onCheckedChange = onSetLowEffectsMode
           )
           DividerLine()
@@ -342,8 +352,8 @@ fun SettingsScreen(
           NavigationPreferenceRow(
             title = "Linked Lock Screen App",
             subtitle = uiState.linkedLockApp?.let {
-              "Linked to ${it.label} — launched on bottom-right Lock tap"
-            } ?: "Not linked — tap to connect your Android Lock Screen app",
+              "Linked to ${it.label} — Power icon active on Home (hold for Quick Actions)"
+            } ?: "No lock app linked — Home button acts as Settings (auto-links on install)",
             testTag = "settings_lock_app_row",
             onClick = onOpenLockAppPicker
           )
@@ -438,7 +448,8 @@ private fun TogglePreferenceRow(
   title: String,
   checked: Boolean,
   onCheckedChange: (Boolean) -> Unit,
-  subtitle: String? = null
+  subtitle: String? = null,
+  enabled: Boolean = true
 ) {
   val haptics = LocalMistHaptics.current
   Row(
@@ -447,6 +458,7 @@ private fun TogglePreferenceRow(
       .fillMaxWidth()
       .heightIn(min = 56.dp)
       .clickable(
+        enabled = enabled,
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(bounded = true, color = MistColors.PureWhite),
         onClick = {
@@ -461,7 +473,7 @@ private fun TogglePreferenceRow(
         text = title,
         fontFamily = FunctionalSansFontFamily,
         fontSize = 14.5.sp,
-        color = MistColors.OffWhite
+        color = if (enabled) MistColors.OffWhite else MistColors.OffWhite.copy(alpha = 0.72f)
       )
       if (subtitle != null) {
         Text(
@@ -475,6 +487,7 @@ private fun TogglePreferenceRow(
     Spacer(modifier = Modifier.width(12.dp))
     Switch(
       checked = checked,
+      enabled = enabled,
       onCheckedChange = {
         haptics.trigger(MistHapticEvent.TAP_LIGHT)
         onCheckedChange(it)
@@ -482,6 +495,8 @@ private fun TogglePreferenceRow(
       colors = SwitchDefaults.colors(
         checkedThumbColor = MistColors.NearBlack,
         checkedTrackColor = MistColors.OffWhite,
+        disabledCheckedThumbColor = MistColors.NearBlack,
+        disabledCheckedTrackColor = MistColors.OffWhite.copy(alpha = 0.65f),
         uncheckedThumbColor = MistColors.MistGrey,
         uncheckedTrackColor = MistColors.SecondaryCharcoal,
         uncheckedBorderColor = MistColors.FrostedGrey.copy(alpha = 0.5f)

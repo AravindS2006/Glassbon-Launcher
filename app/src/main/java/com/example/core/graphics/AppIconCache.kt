@@ -30,8 +30,16 @@ import kotlin.math.min
 class AppIconCache(private val context: Context) {
 
   private val maxEntries = 220
+  private val lowPowerEntries = 48
   private val cache = object : LruCache<String, ImageBitmap>(maxEntries) {}
   private val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+
+  fun setLowMemoryCap(lowPower: Boolean) {
+    val target = if (lowPower) lowPowerEntries else maxEntries
+    if (cache.maxSize() != target) {
+      cache.resize(target)
+    }
+  }
 
   fun getCached(componentKey: String, style: IconStyle): ImageBitmap? {
     return cache.get("${componentKey}_${style.name}")

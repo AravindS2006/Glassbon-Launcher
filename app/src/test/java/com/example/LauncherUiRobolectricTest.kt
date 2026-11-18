@@ -10,8 +10,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,10 +21,14 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -34,8 +40,20 @@ import java.time.Duration
 @Config(sdk = [36], qualifiers = "w411dp-h915dp-xxhdpi")
 class LauncherUiRobolectricTest {
 
+  private val composeTestRule = createAndroidComposeRule<MainActivity>()
+
+  private val resetPreferencesRule = object : ExternalResource() {
+    override fun before() {
+      runBlocking {
+        com.example.data.preferences.PreferencesRepository(
+          androidx.test.core.app.ApplicationProvider.getApplicationContext()
+        ).resetAllForTest()
+      }
+    }
+  }
+
   @get:Rule
-  val composeTestRule = createAndroidComposeRule<MainActivity>()
+  val ruleChain: RuleChain = RuleChain.outerRule(resetPreferencesRule).around(composeTestRule)
 
   private fun registerApp(pkg: String, label: String) {
     val shadowPm = shadowOf(composeTestRule.activity.packageManager)
@@ -82,42 +100,42 @@ class LauncherUiRobolectricTest {
     assertFalse("Back press on Home must not finish MainActivity", activity.isFinishing)
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
 
-    // Register a normal app (not named Lock Screen) so unlinked Lock tap opens the picker dialog
+    // When no Lock Screen app is installed on device, bottom-right button shows Preferences fallback and opens Preferences on tap
+    composeTestRule.onNodeWithContentDescription("Open Glassbon preferences or hold for quick actions")
+      .assertIsDisplayed()
+    composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+
+    // Also verify picker dialog opens cleanly from Preferences -> Linked Lock Screen App -> Unlink/Cancel
+    composeTestRule.onNodeWithTag("settings_lock_app_row").performScrollTo().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("lock_dialog_cancel_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("settings_back_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+
+    // Install a Lock Screen utility -> Glassbon auto-detects & links it automatically, switching icon to Power
     val customLockPkg = "com.example.lockscreenapp"
     registerApp(customLockPkg, "Touch Lock")
     activity.sendBroadcast(Intent(Intent.ACTION_PACKAGE_ADDED).apply {
       data = android.net.Uri.parse("package:$customLockPkg")
     })
     composeTestRule.waitForIdle()
-
-    // Single tap on bottom-right Lock button opens Link Lock Screen App picker
-    composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertIsDisplayed()
-
-    // Picking an app from the dialog links it AND launches it immediately
-    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      composeTestRule.onAllNodesWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true)
-        .fetchSemanticsNodes().isNotEmpty()
-    }
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true)
-      .performScrollTo()
-      .assertIsDisplayed()
-      .performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertDoesNotExist()
-    val firstLaunch = shadowOf(activity).nextStartedActivity
-      ?: shadowOf(activity.application).nextStartedActivity
-    assertEquals(customLockPkg, firstLaunch?.component?.packageName)
-
-    // Ensure DataStore persistence completes before testing subsequent direct tap on slow CI runners
     val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
     composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      viewModel.uiState.value.linkedLockApp?.packageName == customLockPkg
+      Thread.sleep(25)
+      composeTestRule.onAllNodesWithContentDescription("Lock screen or hold for quick actions")
+        .fetchSemanticsNodes().isNotEmpty() &&
+        viewModel.uiState.value.linkedLockApp?.packageName == customLockPkg
     }
+    composeTestRule.waitForIdle()
 
-    // Subsequent tap on Lock button launches the linked app directly without showing the picker
+    // Bottom-right button is now the Power button and tapping it directly launches the linked Lock Screen app
+    composeTestRule.onNodeWithContentDescription("Lock screen or hold for quick actions")
+      .assertIsDisplayed()
     ShadowSystemClock.advanceBy(Duration.ofMillis(400))
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
@@ -126,12 +144,31 @@ class LauncherUiRobolectricTest {
       ?: shadowOf(activity.application).nextStartedActivity
     assertEquals(customLockPkg, directLaunch?.component?.packageName)
 
-    // Long press opens Quick Actions with Lock Screen row (showing linked badge) and NO OLED Calm Screen row
+    // Manual unlink via Preferences -> Linked Lock Screen App falls back to Preferences icon cleanly
     composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput { longClick() }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_lock_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("qa_calm_screen").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("qa_preferences").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("settings_lock_app_row").performScrollTo().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_clear_link_button").assertIsDisplayed().performClick()
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(25)
+      composeTestRule.onAllNodesWithTag("lock_app_picker_dialog").fetchSemanticsNodes().isEmpty() &&
+        viewModel.uiState.value.linkedLockApp == null
+    }
+    assertNull(viewModel.uiState.value.linkedLockApp)
+    composeTestRule.onNodeWithTag("settings_back_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithContentDescription("Open Glassbon preferences or hold for quick actions")
+      .assertIsDisplayed()
+
+    // Quick Actions -> Screen Lock Settings opens Android Security Settings cleanly
+    composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput { longClick() }
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     val startedIntent = shadowOf(activity).nextStartedActivity
@@ -291,5 +328,55 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("walkthrough_skip_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("walkthrough_overlay").assertDoesNotExist()
+  }
+
+  @Test
+  fun `skipping tour surfaces hold for preferences hint pill when power icon is active and dismisses on open`() {
+    val activity = composeTestRule.activity
+    val lockPkg = "com.example.lockscreenapp"
+    registerApp(lockPkg, "Lock Screen")
+    activity.sendBroadcast(Intent(Intent.ACTION_PACKAGE_ADDED).apply {
+      data = android.net.Uri.parse("package:$lockPkg")
+    })
+    composeTestRule.waitForIdle()
+    val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(25)
+      composeTestRule.onAllNodesWithContentDescription("Lock screen or hold for quick actions")
+        .fetchSemanticsNodes().isNotEmpty() &&
+        viewModel.uiState.value.linkedLockApp?.packageName == lockPkg
+    }
+    composeTestRule.waitForIdle()
+
+    // User opens tour and immediately hits Skip
+    composeTestRule.onNodeWithTag("home_start_tour_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("walkthrough_skip_button").performClick()
+    composeTestRule.waitForIdle()
+    // Dismiss onboarding card if still visible (e.g. when device has another default Home app)
+    if (composeTestRule.onAllNodesWithTag("onboarding_dismiss_button").fetchSemanticsNodes().isNotEmpty()) {
+      composeTestRule.onNodeWithTag("onboarding_dismiss_button").performClick()
+      composeTestRule.waitForIdle()
+    }
+
+    // Subtle Hold ⏻ for Preferences hint appears cleanly above the Power icon
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("power_hold_hint_pill").assertIsDisplayed()
+
+    // Tapping the hint action opens Quick Actions and permanently marks Quick Actions as discovered
+    composeTestRule.onNodeWithTag("power_hold_hint_action").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(25)
+      viewModel.uiState.value.preferences.quickActionsDiscovered
+    }
+    composeTestRule.runOnUiThread {
+      activity.onBackPressedDispatcher.onBackPressed()
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("power_hold_hint_pill").assertDoesNotExist()
   }
 }
