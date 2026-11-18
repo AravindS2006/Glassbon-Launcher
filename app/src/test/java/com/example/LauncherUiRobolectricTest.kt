@@ -122,8 +122,8 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("home_quick_actions_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertDoesNotExist()
-    val directLaunch = shadowOf(activity.application).nextStartedActivity
-      ?: shadowOf(activity).nextStartedActivity
+    val directLaunch = shadowOf(activity).nextStartedActivity
+      ?: shadowOf(activity.application).nextStartedActivity
     assertEquals(customLockPkg, directLaunch?.component?.packageName)
 
     // Long press opens Quick Actions with Lock Screen row (showing linked badge) and NO OLED Calm Screen row

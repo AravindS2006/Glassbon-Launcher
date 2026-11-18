@@ -101,6 +101,7 @@ android {
     unitTests {
       isIncludeAndroidResources = true
       all {
+        it.forkEvery = 1L
         it.maxHeapSize = "2g"
         it.testLogging {
           events("passed", "skipped", "failed")

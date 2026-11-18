@@ -487,10 +487,13 @@ fun AppDrawerScreen(
 
   // Initial jump when opening the drawer from Home screen's Alphabet Rail:
   // Wait for LazyColumn's initial measurement pass + viewport height so centering never drops or pins to top.
-  LaunchedEffect(uiState.drawerJumpTarget, sectionIndexMap, uiState.drawerRows.size) {
+  LaunchedEffect(uiState.drawerJumpTarget, uiState.isLoading, sectionIndexMap, uiState.drawerRows.size) {
     val target = uiState.drawerJumpTarget ?: return@LaunchedEffect
     if (targetContinuousRowState.floatValue >= 0f) {
       onJumpTargetHandled()
+      return@LaunchedEffect
+    }
+    if (uiState.isLoading || uiState.drawerRows.isEmpty() || sectionIndexMap.isEmpty()) {
       return@LaunchedEffect
     }
     val resolved = findNearestSection(target, sectionIndexMap)
