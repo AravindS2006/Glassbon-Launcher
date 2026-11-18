@@ -460,7 +460,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
   fun onHomePowerButtonTap(context: Context = appContext) {
     when (uiState.value.preferences.quickActionMode) {
-      QuickActionMode.LOCK_SCREEN -> triggerScreenLock()
+      QuickActionMode.LOCK_SCREEN -> triggerScreenLock(context)
       QuickActionMode.QUICK_PANEL -> toggleQuickActions(true)
       QuickActionMode.DIRECT_SEARCH -> openDrawer(withSearch = true)
       QuickActionMode.DIRECT_LIBRARY -> openDrawer(withSearch = false)
@@ -468,11 +468,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
   }
 
-  fun triggerScreenLock() {
+  fun triggerScreenLock(context: Context = appContext) {
     val state = uiState.value
     val linked = state.linkedLockApp
     if (linked != null) {
-      val launched = appRepository.launchApp(linked)
+      val launched = appRepository.launchApp(linked, context)
       transientState.update {
         it.copy(
           showQuickActions = false,
@@ -486,7 +486,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     val autoCandidate = LockScreenAppHelper.pickAutoLinkCandidate(state.allApps)
-    if (autoCandidate != null && appRepository.launchApp(autoCandidate)) {
+    if (autoCandidate != null && appRepository.launchApp(autoCandidate, context)) {
       viewModelScope.launch {
         preferencesRepository.setLockAppComponentKey(autoCandidate.componentKey)
       }
@@ -525,7 +525,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
   }
 
-  fun selectLockScreenApp(app: AppInfo) {
+  fun selectLockScreenApp(app: AppInfo, context: Context = appContext) {
     val shouldLaunch = transientState.value.launchLockAppAfterPick
     transientState.update {
       it.copy(
@@ -537,7 +537,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       preferencesRepository.setLockAppComponentKey(app.componentKey)
     }
     if (shouldLaunch) {
-      val launched = appRepository.launchApp(app)
+      val launched = appRepository.launchApp(app, context)
       if (!launched) {
         transientState.update {
           it.copy(statusMessage = "${app.label} is unavailable.")
@@ -637,8 +637,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
   }
 
-  fun launchApp(app: AppInfo) {
-    val launched = appRepository.launchApp(app)
+  fun launchApp(app: AppInfo, context: Context = appContext) {
+    val launched = appRepository.launchApp(app, context)
     if (!launched) {
       transientState.update {
         it.copy(statusMessage = "${app.label} is unavailable.")

@@ -238,7 +238,7 @@ fun LauncherRoot(
         hideLeftAlphabetRail = activeHomeScrubSide == AlphabetRailSide.LEFT,
         homeScrubPullProvider = { homeScrubPullRatio.floatValue },
         onJumpTargetHandled = { viewModel.updateDrawerJumpTarget(null) },
-        onLaunchApp = { viewModel.launchApp(it) },
+        onLaunchApp = { viewModel.launchApp(it, context) },
         onLongPressApp = { viewModel.openContextMenu(it) },
         onSearchActiveChange = { viewModel.setSearchActive(it) },
         onSearchQueryChange = { viewModel.updateSearchQuery(it) },
@@ -277,7 +277,7 @@ fun LauncherRoot(
           activeHomeScrubSide = null
           homeScrubPullRatio.floatValue = 0f
         },
-        onLaunchApp = { viewModel.launchApp(it) },
+        onLaunchApp = { viewModel.launchApp(it, context) },
         onLongPressApp = { viewModel.openContextMenu(it) },
         onPowerButtonTap = { viewModel.onHomePowerButtonTap(context) },
         onPowerButtonLongPress = { viewModel.toggleQuickActions(true) },
@@ -388,7 +388,7 @@ fun LauncherRoot(
         isDefaultLauncher = uiState.isDefaultLauncher,
         linkedLockAppLabel = uiState.linkedLockApp?.label,
         reducedMotion = prefs.effectiveReducedMotion,
-        onLockScreen = { viewModel.triggerScreenLock() },
+        onLockScreen = { viewModel.triggerScreenLock(context) },
         onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
@@ -415,7 +415,7 @@ fun LauncherRoot(
         iconStyle = prefs.iconStyle,
         reducedMotion = prefs.effectiveReducedMotion,
         lowPowerMode = prefs.effectiveLowEffects,
-        onSelectApp = { viewModel.selectLockScreenApp(it) },
+        onSelectApp = { viewModel.selectLockScreenApp(it, context) },
         onClearLink = { viewModel.clearLockScreenApp() },
         onOpenSecuritySettings = {
           viewModel.dismissLockAppPicker()

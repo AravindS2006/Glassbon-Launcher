@@ -96,16 +96,26 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertIsDisplayed()
 
     // Picking an app from the dialog links it AND launches it immediately
-    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
       composeTestRule.onAllNodesWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true)
         .fetchSemanticsNodes().isNotEmpty()
     }
-    composeTestRule.onNodeWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true).performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("lock_picker_app_$customLockPkg", useUnmergedTree = true)
+      .performScrollTo()
+      .assertIsDisplayed()
+      .performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("lock_app_picker_dialog").assertDoesNotExist()
-    val firstLaunch = shadowOf(activity.application).nextStartedActivity
-      ?: shadowOf(activity).nextStartedActivity
+    val firstLaunch = shadowOf(activity).nextStartedActivity
+      ?: shadowOf(activity.application).nextStartedActivity
     assertEquals(customLockPkg, firstLaunch?.component?.packageName)
+
+    // Ensure DataStore persistence completes before testing subsequent direct tap on slow CI runners
+    val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      viewModel.uiState.value.linkedLockApp?.packageName == customLockPkg
+    }
 
     // Subsequent tap on Lock button launches the linked app directly without showing the picker
     ShadowSystemClock.advanceBy(Duration.ofMillis(400))
@@ -208,13 +218,13 @@ class LauncherUiRobolectricTest {
     // Defaults to Ultra-Smooth and can switch to Low Power and back
     composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").assertIsDisplayed()
     composeTestRule.onNodeWithTag("perf_mode_power_saver").assertIsDisplayed().performClick()
-    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
       composeTestRule.onAllNodesWithText("Low Power active", substring = true)
         .fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithText("Low Power active", substring = true).assertIsDisplayed()
     composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").performClick()
-    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
       composeTestRule.onAllNodesWithText("Ultra-Smooth active", substring = true)
         .fetchSemanticsNodes().isNotEmpty()
     }

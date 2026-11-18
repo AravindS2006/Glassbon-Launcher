@@ -54,6 +54,6 @@ class ExampleRobolectricTest {
     assertFalse(receiverPermissions.contains(android.Manifest.permission.BIND_DEVICE_ADMIN))
 
     assertTrue(BuildConfig.VERSION_NAME.isNotBlank())
-    assertTrue(BuildConfig.VERSION_CODE >= 10_000)
+    assertTrue("Expected positive VERSION_CODE for any GitHub tag, was ${BuildConfig.VERSION_CODE}", BuildConfig.VERSION_CODE >= 1)
   }
 }

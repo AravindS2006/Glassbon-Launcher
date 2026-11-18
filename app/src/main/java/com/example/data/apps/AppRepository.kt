@@ -85,6 +85,7 @@ class AppRepository(
   }
 
   private var registered = false
+  private var refreshJob: kotlinx.coroutines.Job? = null
 
   fun startObserving() {
     if (!registered) {
@@ -116,13 +117,16 @@ class AppRepository(
   fun stopObserving() {
     if (!registered) return
     registered = false
+    refreshJob?.cancel()
+    refreshJob = null
     runCatching { launcherApps?.unregisterCallback(launcherAppsCallback) }
     runCatching { context.unregisterReceiver(packageReceiver) }
     runCatching { context.unregisterReceiver(localeReceiver) }
   }
 
   fun refreshApps() {
-    scope.launch {
+    refreshJob?.cancel()
+    refreshJob = scope.launch {
       val discovered = queryLaunchableApps()
       _apps.value = discovered
       _isLoading.value = false
@@ -185,7 +189,7 @@ class AppRepository(
     AppIndexHelper.sortAppsAlphabetically(deduplicated, locale)
   }
 
-  fun launchApp(app: AppInfo): Boolean {
+  fun launchApp(app: AppInfo, callerContext: Context = context): Boolean {
     val now = SystemClock.elapsedRealtime()
     if (lastLaunchedComponent == app.componentKey && now - lastLaunchElapsedMs < 350L) {
       return false
@@ -198,7 +202,7 @@ class AppRepository(
       val launchIntent = Intent.makeMainActivity(component).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
       }
-      context.startActivity(launchIntent)
+      callerContext.startActivity(launchIntent)
       true
     } catch (primaryEx: ActivityNotFoundException) {
       launchViaLauncherAppsOrRefresh(component, app.packageName, primaryEx)

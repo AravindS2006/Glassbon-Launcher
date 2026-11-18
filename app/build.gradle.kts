@@ -29,7 +29,7 @@ val normalizedVersionName: String = rawVersionTag.removePrefix("v").removePrefix
   .ifBlank { "1.0.0" }
 
 val computedVersionCode: Int = run {
-  val match = Regex("""^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(\d+))?""").find(normalizedVersionName)
+  val match = Regex("""(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(\d+))?""").find(normalizedVersionName)
   if (match != null) {
     val major = match.groupValues[1].toIntOrNull() ?: 1
     val minor = match.groupValues[2].toIntOrNull() ?: 0

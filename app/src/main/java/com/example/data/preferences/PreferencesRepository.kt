@@ -2,6 +2,7 @@ package com.example.data.preferences
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -9,15 +10,29 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.concurrent.ConcurrentHashMap
 
-private val Context.mistDataStore: DataStore<Preferences> by preferencesDataStore(
-  name = "mist_launcher_preferences"
-)
+private object MistDataStoreRegistry {
+  private val stores = ConcurrentHashMap<String, DataStore<Preferences>>()
+
+  fun get(context: Context): DataStore<Preferences> {
+    val appCtx = context.applicationContext ?: context
+    val key = runCatching { appCtx.filesDir.canonicalPath }.getOrDefault(appCtx.packageName)
+    return stores.computeIfAbsent(key) {
+      PreferenceDataStoreFactory.create(
+        produceFile = { appCtx.preferencesDataStoreFile("mist_launcher_preferences") }
+      )
+    }
+  }
+}
 
 class PreferencesRepository(private val context: Context) {
+
+  private val dataStore: DataStore<Preferences>
+    get() = MistDataStoreRegistry.get(context)
 
   private object Keys {
     val FAVORITE_KEYS_ORDERED = stringPreferencesKey("favorite_keys_ordered")
@@ -51,7 +66,7 @@ class PreferencesRepository(private val context: Context) {
     val FAVORITES_SEEDED = booleanPreferencesKey("favorites_seeded")
   }
 
-  val preferences: Flow<LauncherPreferences> = context.mistDataStore.data.map { prefs ->
+  val preferences: Flow<LauncherPreferences> = dataStore.data.map { prefs ->
     val orderedFavorites = prefs[Keys.FAVORITE_KEYS_ORDERED]
       ?.split("|")
       ?.filter { it.isNotBlank() }
@@ -94,7 +109,7 @@ class PreferencesRepository(private val context: Context) {
   }
 
   suspend fun updateFavorites(favoriteKeys: List<String>, markSeeded: Boolean = true) {
-    context.mistDataStore.edit { prefs ->
+    dataStore.edit { prefs ->
       prefs[Keys.FAVORITE_KEYS_ORDERED] = favoriteKeys.distinct().joinToString("|")
       if (markSeeded) {
         prefs[Keys.FAVORITES_SEEDED] = true
@@ -103,13 +118,13 @@ class PreferencesRepository(private val context: Context) {
   }
 
   suspend fun setHiddenKeys(hiddenKeys: Set<String>) {
-    context.mistDataStore.edit { prefs ->
+    dataStore.edit { prefs ->
       prefs[Keys.HIDDEN_KEYS] = hiddenKeys
     }
   }
 
   suspend fun setCustomWallpaperPath(path: String?) {
-    context.mistDataStore.edit { prefs ->
+    dataStore.edit { prefs ->
       if (path.isNullOrBlank()) {
         prefs.remove(Keys.CUSTOM_WALLPAPER_PATH)
       } else {
@@ -119,95 +134,95 @@ class PreferencesRepository(private val context: Context) {
   }
 
   suspend fun setGrayscaleWallpaper(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.GRAYSCALE_WALLPAPER] = enabled }
+    dataStore.edit { it[Keys.GRAYSCALE_WALLPAPER] = enabled }
   }
 
   suspend fun setWallpaperDarkening(amount: Float) {
-    context.mistDataStore.edit { it[Keys.WALLPAPER_DARKENING] = amount.coerceIn(0f, 0.85f) }
+    dataStore.edit { it[Keys.WALLPAPER_DARKENING] = amount.coerceIn(0f, 0.85f) }
   }
 
   suspend fun setDrawerBlurIntensity(amount: Float) {
-    context.mistDataStore.edit { it[Keys.DRAWER_BLUR_INTENSITY] = amount.coerceIn(0f, 1f) }
+    dataStore.edit { it[Keys.DRAWER_BLUR_INTENSITY] = amount.coerceIn(0f, 1f) }
   }
 
   suspend fun setIconStyle(style: IconStyle) {
-    context.mistDataStore.edit { it[Keys.ICON_STYLE] = style.name }
+    dataStore.edit { it[Keys.ICON_STYLE] = style.name }
   }
 
   suspend fun setIconSize(size: IconSize) {
-    context.mistDataStore.edit { it[Keys.ICON_SIZE] = size.name }
+    dataStore.edit { it[Keys.ICON_SIZE] = size.name }
   }
 
   suspend fun setTypographyStyle(style: TypographyStyle) {
-    context.mistDataStore.edit { it[Keys.TYPOGRAPHY_STYLE] = style.name }
+    dataStore.edit { it[Keys.TYPOGRAPHY_STYLE] = style.name }
   }
 
   suspend fun setHomeShortcutLimit(limit: Int) {
-    context.mistDataStore.edit { it[Keys.HOME_SHORTCUT_LIMIT] = limit.coerceIn(4, 7) }
+    dataStore.edit { it[Keys.HOME_SHORTCUT_LIMIT] = limit.coerceIn(4, 7) }
   }
 
   suspend fun setShowClock(visible: Boolean) {
-    context.mistDataStore.edit { it[Keys.SHOW_CLOCK] = visible }
+    dataStore.edit { it[Keys.SHOW_CLOCK] = visible }
   }
 
   suspend fun setShowDate(visible: Boolean) {
-    context.mistDataStore.edit { it[Keys.SHOW_DATE] = visible }
+    dataStore.edit { it[Keys.SHOW_DATE] = visible }
   }
 
   suspend fun setShowHomeLabels(visible: Boolean) {
-    context.mistDataStore.edit { it[Keys.SHOW_HOME_LABELS] = visible }
+    dataStore.edit { it[Keys.SHOW_HOME_LABELS] = visible }
   }
 
   suspend fun setShowAlphabetIndex(visible: Boolean) {
-    context.mistDataStore.edit { it[Keys.SHOW_ALPHABET_INDEX] = visible }
+    dataStore.edit { it[Keys.SHOW_ALPHABET_INDEX] = visible }
   }
 
   suspend fun setShowLeftHiddenAlphabet(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.SHOW_LEFT_HIDDEN_ALPHABET] = enabled }
+    dataStore.edit { it[Keys.SHOW_LEFT_HIDDEN_ALPHABET] = enabled }
   }
 
   suspend fun setAlphabetFocusBlur(preset: AlphabetFocusBlur) {
-    context.mistDataStore.edit { it[Keys.ALPHABET_FOCUS_BLUR] = preset.name }
+    dataStore.edit { it[Keys.ALPHABET_FOCUS_BLUR] = preset.name }
   }
 
   suspend fun setHomeAlphabetVisibility(visibility: HomeAlphabetVisibility) {
-    context.mistDataStore.edit { it[Keys.HOME_ALPHABET_VISIBILITY] = visibility.name }
+    dataStore.edit { it[Keys.HOME_ALPHABET_VISIBILITY] = visibility.name }
   }
 
   suspend fun setSwipeUpOpensDrawer(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.SWIPE_UP_OPENS_DRAWER] = enabled }
+    dataStore.edit { it[Keys.SWIPE_UP_OPENS_DRAWER] = enabled }
   }
 
   suspend fun setSearchAutoFocusKeyboard(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.SEARCH_AUTO_FOCUS_KEYBOARD] = enabled }
+    dataStore.edit { it[Keys.SEARCH_AUTO_FOCUS_KEYBOARD] = enabled }
   }
 
   suspend fun setPerformanceProfile(profile: PerformanceProfile) {
-    context.mistDataStore.edit { it[Keys.PERFORMANCE_PROFILE] = profile.name }
+    dataStore.edit { it[Keys.PERFORMANCE_PROFILE] = profile.name }
   }
 
   suspend fun setReducedMotion(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.REDUCED_MOTION] = enabled }
+    dataStore.edit { it[Keys.REDUCED_MOTION] = enabled }
   }
 
   suspend fun setLowEffectsMode(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.LOW_EFFECTS_MODE] = enabled }
+    dataStore.edit { it[Keys.LOW_EFFECTS_MODE] = enabled }
   }
 
   suspend fun setHapticFeedback(enabled: Boolean) {
-    context.mistDataStore.edit { it[Keys.HAPTIC_FEEDBACK] = enabled }
+    dataStore.edit { it[Keys.HAPTIC_FEEDBACK] = enabled }
   }
 
   suspend fun setHapticProfile(profile: HapticProfile) {
-    context.mistDataStore.edit { it[Keys.HAPTIC_PROFILE] = profile.name }
+    dataStore.edit { it[Keys.HAPTIC_PROFILE] = profile.name }
   }
 
   suspend fun setQuickActionMode(mode: QuickActionMode) {
-    context.mistDataStore.edit { it[Keys.QUICK_ACTION_MODE] = mode.name }
+    dataStore.edit { it[Keys.QUICK_ACTION_MODE] = mode.name }
   }
 
   suspend fun setLockAppComponentKey(componentKey: String?) {
-    context.mistDataStore.edit { prefs ->
+    dataStore.edit { prefs ->
       if (componentKey.isNullOrBlank()) {
         prefs.remove(Keys.LOCK_APP_COMPONENT_KEY)
       } else {
@@ -217,11 +232,11 @@ class PreferencesRepository(private val context: Context) {
   }
 
   suspend fun setOnboardingDismissed(dismissed: Boolean) {
-    context.mistDataStore.edit { it[Keys.ONBOARDING_DISMISSED] = dismissed }
+    dataStore.edit { it[Keys.ONBOARDING_DISMISSED] = dismissed }
   }
 
   suspend fun setWalkthroughCompleted(completed: Boolean) {
-    context.mistDataStore.edit { it[Keys.WALKTHROUGH_COMPLETED] = completed }
+    dataStore.edit { it[Keys.WALKTHROUGH_COMPLETED] = completed }
   }
 
   private inline fun <reified T : Enum<T>> parseEnum(raw: String?, fallback: T): T {

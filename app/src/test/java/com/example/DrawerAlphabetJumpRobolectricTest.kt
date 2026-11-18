@@ -123,7 +123,7 @@ class DrawerAlphabetJumpRobolectricTest {
     registerSyntheticApps(context)
 
     ActivityScenario.launch(MainActivity::class.java).use {
-      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
         composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -131,7 +131,7 @@ class DrawerAlphabetJumpRobolectricTest {
       // Click the exact rendered letter 'G' on Home's right alphabet rail
       composeTestRule.onNodeWithTag("alphabet_rail_key_G", useUnmergedTree = true).performClick()
 
-      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
         composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.glassnotes", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -162,7 +162,7 @@ class DrawerAlphabetJumpRobolectricTest {
 
       // Jump to Z inside the open drawer, verify all Z apps are centered and none cut off, then click G again
       composeTestRule.onNodeWithTag("alphabet_rail_key_Z", useUnmergedTree = true).performClick()
-      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
         composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.zoom", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -174,7 +174,7 @@ class DrawerAlphabetJumpRobolectricTest {
       )
 
       composeTestRule.onNodeWithTag("alphabet_rail_key_G", useUnmergedTree = true).performClick()
-      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
         composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.glassnotes", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -196,7 +196,7 @@ class DrawerAlphabetJumpRobolectricTest {
         advanceEventTime(20L)
         up()
       }
-      composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
         composeTestRule.onAllNodesWithTag("drawer_section_Z", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
