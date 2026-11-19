@@ -5,9 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -35,6 +37,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.haptics.LocalMistHaptics
@@ -101,108 +104,122 @@ fun ClockView(
 
   val useSans = typographyStyle == TypographyStyle.CLEAN_SANS
   val clockFontFamily = if (useSans) FunctionalSansFontFamily else EditorialDisplayFontFamily
-  val clockFontSize = when {
-    useSans && !isMediaActive -> 70.sp
-    useSans -> 60.sp
-    !isMediaActive -> 78.sp
-    else -> 68.sp
-  }
-  val clockLineHeight = when {
-    useSans && !isMediaActive -> 72.sp
-    useSans -> 62.sp
-    !isMediaActive -> 78.sp
-    else -> 68.sp
-  }
 
-  Column(
-    horizontalAlignment = Alignment.Start,
-    modifier = modifier.testTag("home_clock_area")
-  ) {
-    if (showClock) {
-      // Optical left-bearing alignment (-3.dp) keeps large clock numerals flush with the Calendar pill below
-      Text(
-        text = snapshot.formattedTime,
-        fontFamily = clockFontFamily,
-        fontWeight = if (useSans) FontWeight.SemiBold else FontWeight.Normal,
-        fontStyle = if (!useSans && typographyStyle == TypographyStyle.SERIF_ITALIC) {
-          FontStyle.Italic
-        } else {
-          FontStyle.Normal
-        },
-        fontSize = clockFontSize,
-        lineHeight = clockLineHeight,
-        letterSpacing = if (useSans) (-2.6).sp else (-1.4).sp,
-        style = TextStyle(
-          brush = primaryBrush,
-          shadow = subtleShadow,
-          platformStyle = PlatformTextStyle(includeFontPadding = false)
-        ),
-        modifier = Modifier
-          .offset(x = (-3).dp)
-          .clip(RoundedCornerShape(12.dp))
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = ripple(bounded = true, color = rippleColor),
-            role = Role.Button,
-            onClick = {
-              haptics.trigger(MistHapticEvent.TAP_LIGHT)
-              onClockClick()
-            }
-          )
-          .padding(horizontal = 2.dp, vertical = 2.dp)
-          .testTag("home_clock_text")
-      )
+  BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+    val isNarrow = maxWidth < 290.dp
+    val clockFontSize = when {
+      useSans && isNarrow -> 56.sp
+      useSans && !isMediaActive -> 70.sp
+      useSans -> 60.sp
+      isNarrow -> 62.sp
+      !isMediaActive -> 78.sp
+      else -> 68.sp
+    }
+    val clockLineHeight = when {
+      useSans && isNarrow -> 58.sp
+      useSans && !isMediaActive -> 72.sp
+      useSans -> 62.sp
+      isNarrow -> 64.sp
+      !isMediaActive -> 78.sp
+      else -> 68.sp
     }
 
-    if (showClock && showDate) {
-      Spacer(modifier = Modifier.height(8.dp))
-    }
-
-    if (showDate) {
-      val pillShape = remember { RoundedCornerShape(12.dp) }
-      Box(
-        modifier = Modifier
-          .heightIn(min = 48.dp)
-          .clip(pillShape)
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = ripple(bounded = true, color = rippleColor),
-            role = Role.Button,
-            onClick = {
-              haptics.trigger(MistHapticEvent.TAP_LIGHT)
-              onDateClick()
-            }
+    Column(
+      horizontalAlignment = Alignment.Start,
+      modifier = Modifier.testTag("home_clock_area")
+    ) {
+      if (showClock) {
+        // Optical left-bearing alignment (-3.dp) keeps large clock numerals flush with the Calendar pill below
+        Text(
+          text = snapshot.formattedTime,
+          fontFamily = clockFontFamily,
+          fontWeight = if (useSans) FontWeight.SemiBold else FontWeight.Normal,
+          fontStyle = if (!useSans && typographyStyle == TypographyStyle.SERIF_ITALIC) {
+            FontStyle.Italic
+          } else {
+            FontStyle.Normal
+          },
+          fontSize = clockFontSize,
+          lineHeight = clockLineHeight,
+          letterSpacing = if (useSans) (-2.6).sp else (-1.4).sp,
+          maxLines = 1,
+          softWrap = false,
+          overflow = TextOverflow.Clip,
+          style = TextStyle(
+            brush = primaryBrush,
+            shadow = subtleShadow,
+            platformStyle = PlatformTextStyle(includeFontPadding = false)
           ),
-        contentAlignment = Alignment.CenterStart
-      ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
           modifier = Modifier
+            .offset(x = (-3).dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = ripple(bounded = true, color = rippleColor),
+              role = Role.Button,
+              onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                onClockClick()
+              }
+            )
+            .padding(horizontal = 2.dp, vertical = 2.dp)
+            .testTag("home_clock_text")
+        )
+      }
+
+      if (showClock && showDate) {
+        Spacer(modifier = Modifier.height(8.dp))
+      }
+
+      if (showDate) {
+        val pillShape = remember { RoundedCornerShape(12.dp) }
+        Box(
+          modifier = Modifier
+            .heightIn(min = 48.dp)
             .clip(pillShape)
-            .background(pillBgColor)
-            .border(0.7.dp, pillBorderColor, pillShape)
-            .padding(horizontal = 12.dp, vertical = 7.dp)
-        ) {
-          Icon(
-            imageVector = Icons.Outlined.CalendarToday,
-            contentDescription = null,
-            tint = pillIconColor,
-            modifier = Modifier.size(13.dp)
-          )
-          Spacer(modifier = Modifier.width(7.dp))
-          Text(
-            text = snapshot.formattedDate.uppercase(),
-            fontFamily = FunctionalSansFontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = if (isMediaActive) 11.5.sp else 12.sp,
-            lineHeight = 15.sp,
-            letterSpacing = 0.85.sp,
-            color = pillTextColor,
-            style = TextStyle(
-              platformStyle = PlatformTextStyle(includeFontPadding = false)
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = ripple(bounded = true, color = rippleColor),
+              role = Role.Button,
+              onClick = {
+                haptics.trigger(MistHapticEvent.TAP_LIGHT)
+                onDateClick()
+              }
             ),
-            modifier = Modifier.testTag("home_date_text")
-          )
+          contentAlignment = Alignment.CenterStart
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+              .clip(pillShape)
+              .background(pillBgColor)
+              .border(0.7.dp, pillBorderColor, pillShape)
+              .padding(horizontal = 12.dp, vertical = 7.dp)
+          ) {
+            Icon(
+              imageVector = Icons.Outlined.CalendarToday,
+              contentDescription = null,
+              tint = pillIconColor,
+              modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(7.dp))
+            Text(
+              text = snapshot.formattedDate.uppercase(),
+              fontFamily = FunctionalSansFontFamily,
+              fontWeight = FontWeight.Medium,
+              fontSize = if (isMediaActive || isNarrow) 11.5.sp else 12.sp,
+              lineHeight = 15.sp,
+              letterSpacing = 0.85.sp,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
+              color = pillTextColor,
+              style = TextStyle(
+                platformStyle = PlatformTextStyle(includeFontPadding = false)
+              ),
+              modifier = Modifier.testTag("home_date_text")
+            )
+          }
         }
       }
     }

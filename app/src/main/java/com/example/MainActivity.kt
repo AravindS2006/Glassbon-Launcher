@@ -86,9 +86,13 @@ class MainActivity : ComponentActivity() {
   }
 
   private fun launchDefaultHomeRequest() {
-    val intent = DefaultLauncherHelper.createRequestDefaultHomeIntent(this)
-    runCatching {
-      requestHomeRoleLauncher.launch(intent)
+    val primary = DefaultLauncherHelper.createRequestDefaultHomeIntent(this)
+    val candidates = listOf(primary) + DefaultLauncherHelper.createDefaultAppsFallbackIntents()
+    for (intent in candidates) {
+      val launched = runCatching {
+        requestHomeRoleLauncher.launch(intent)
+      }.isSuccess
+      if (launched) return
     }
   }
 }

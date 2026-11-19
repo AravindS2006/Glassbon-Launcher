@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
@@ -52,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -67,7 +66,6 @@ fun QuickActionsOverlay(
   linkedLockAppLabel: String? = null,
   reducedMotion: Boolean = false,
   onLockScreen: () -> Unit,
-  onOpenLockScreenSettings: () -> Unit,
   onOpenLibrary: () -> Unit,
   onOpenSearch: () -> Unit,
   onOpenWallpaper: () -> Unit,
@@ -102,13 +100,14 @@ fun QuickActionsOverlay(
         onClick = onDismiss
       )
       .windowInsetsPadding(WindowInsets.navigationBars)
-      .padding(horizontal = 24.dp, vertical = 20.dp)
+      .padding(horizontal = 20.dp, vertical = 20.dp)
       .testTag("quick_actions_overlay")
   ) {
     GlassSurface(
       modifier = Modifier
         .align(Alignment.BottomEnd)
-        .widthIn(min = 260.dp, max = 320.dp)
+        .fillMaxWidth()
+        .widthIn(max = 320.dp)
         .graphicsLayer {
           val p = reveal.value
           alpha = p.coerceIn(0f, 1f)
@@ -132,6 +131,8 @@ fun QuickActionsOverlay(
           text = stringResource(R.string.quick_actions_title),
           fontFamily = FunctionalSansFontFamily,
           fontSize = 18.sp,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
           color = MistColors.OffWhite,
           modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
         )
@@ -188,15 +189,11 @@ fun QuickActionsOverlay(
         )
 
         QuickActionRow(
-          icon = Icons.Outlined.Lock,
-          label = stringResource(R.string.action_lock_settings),
-          testTag = "qa_lock_settings",
-          onClick = onOpenLockScreenSettings
-        )
-        QuickActionRow(
           icon = Icons.Outlined.Home,
-          label = stringResource(R.string.action_set_default_home),
-          badge = if (isDefaultLauncher) "Active" else "Set",
+          label = stringResource(
+            if (isDefaultLauncher) R.string.action_change_default_home else R.string.action_set_default_home
+          ),
+          badge = if (isDefaultLauncher) "Switch" else "Set",
           testTag = "qa_default_home",
           onClick = onRequestDefaultHome
         )
@@ -249,6 +246,8 @@ private fun QuickActionRow(
       text = label,
       fontFamily = FunctionalSansFontFamily,
       fontSize = 14.sp,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
       color = MistColors.OffWhite,
       modifier = Modifier.weight(1f)
     )
@@ -258,7 +257,11 @@ private fun QuickActionRow(
         text = badge,
         fontFamily = FunctionalSansFontFamily,
         fontSize = 11.sp,
-        color = MistColors.MistGrey.copy(alpha = 0.78f)
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        color = MistColors.MistGrey.copy(alpha = 0.78f),
+        modifier = Modifier.widthIn(max = 108.dp)
       )
     }
   }

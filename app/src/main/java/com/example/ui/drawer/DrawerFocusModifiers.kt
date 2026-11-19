@@ -79,16 +79,33 @@ fun Modifier.drawerFocusSpotlight(
 ): Modifier = this
   .graphicsLayer {
     val focusedSection = focusedSectionProvider()
-    val isNonFocused =
-      focusedSection != null &&
-        blurPreset != AlphabetFocusBlur.OFF &&
-        rowSectionKey != focusedSection
-    val blend = if (isNonFocused) focusBlendProvider().coerceIn(0f, 1f) else 0f
+    val hasFocus = focusedSection != null && blurPreset != AlphabetFocusBlur.OFF
+    val isFocused = hasFocus && rowSectionKey == focusedSection
+    val isNonFocused = hasFocus && rowSectionKey != focusedSection
 
-    alpha = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, blend)
-    val scale = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.scaleFactor, blend)
-    scaleX = scale
-    scaleY = scale
+    val rawBlend = if (hasFocus) focusBlendProvider().coerceIn(0f, 1f) else 0f
+    // Cubic-out easing gives silky physical deceleration with zero CPU overhead
+    val inv = 1f - rawBlend
+    val easedBlend = 1f - (inv * inv * inv)
+
+    if (isFocused) {
+      alpha = 1f
+      val liftScale = if (easedBlend <= 0.001f) 1f else lerp(1f, 1.018f, easedBlend)
+      scaleX = liftScale
+      scaleY = liftScale
+      translationX = if (easedBlend <= 0.001f) 0f else lerp(0f, 6.dp.toPx(), easedBlend)
+    } else if (isNonFocused) {
+      alpha = if (easedBlend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, easedBlend)
+      val scale = if (easedBlend <= 0.001f) 1f else lerp(1f, blurPreset.scaleFactor, easedBlend)
+      scaleX = scale
+      scaleY = scale
+      translationX = if (easedBlend <= 0.001f) 0f else lerp(0f, -5.dp.toPx(), easedBlend)
+    } else {
+      alpha = 1f
+      scaleX = 1f
+      scaleY = 1f
+      translationX = 0f
+    }
     transformOrigin = LeftCenterTransformOrigin
 
     val applyBlur =
@@ -96,7 +113,7 @@ fun Modifier.drawerFocusSpotlight(
         !isMovingProvider() &&
         cachedBlurEffect != null &&
         isNonFocused &&
-        blend >= 0.72f
+        rawBlend >= 0.72f
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       renderEffect = if (applyBlur) cachedBlurEffect else null
     }
@@ -107,14 +124,16 @@ fun Modifier.drawerFocusSpotlight(
       focusedSection != null &&
         blurPreset != AlphabetFocusBlur.OFF &&
         rowSectionKey != focusedSection
-    val blend = if (isNonFocused) focusBlendProvider().coerceIn(0f, 1f) else 0f
+    val rawBlend = if (isNonFocused) focusBlendProvider().coerceIn(0f, 1f) else 0f
+    val inv = 1f - rawBlend
+    val easedBlend = 1f - (inv * inv * inv)
     val applyBlur =
       !lowEffectsMode &&
         !isMovingProvider() &&
         isNonFocused &&
         blurPreset != AlphabetFocusBlur.OFF &&
-        blend >= 0.72f
+        rawBlend >= 0.72f
 
     drawerFocusBlurRadiusDp = if (applyBlur) blurPreset.blurRadiusDp else 0f
-    drawerFocusAlpha = if (blend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, blend)
+    drawerFocusAlpha = if (easedBlend <= 0.001f) 1f else lerp(1f, blurPreset.dimAlpha, easedBlend)
   }

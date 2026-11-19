@@ -32,6 +32,9 @@ object DefaultLauncherHelper {
   }
 
   fun createRequestDefaultHomeIntent(context: Context): Intent {
+    if (isDefaultLauncher(context)) {
+      return createSwitchDefaultHomeIntent()
+    }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       val roleManager = context.getSystemService(RoleManager::class.java)
       if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
@@ -39,5 +42,17 @@ object DefaultLauncherHelper {
       }
     }
     return Intent(Settings.ACTION_HOME_SETTINGS)
+  }
+
+  fun createSwitchDefaultHomeIntent(): Intent {
+    return Intent(Settings.ACTION_HOME_SETTINGS)
+  }
+
+  fun createDefaultAppsFallbackIntents(): List<Intent> {
+    return listOf(
+      Intent(Settings.ACTION_HOME_SETTINGS),
+      Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+      Intent(Settings.ACTION_SETTINGS)
+    )
   }
 }

@@ -166,13 +166,16 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithContentDescription("Open Glassbon preferences or hold for quick actions")
       .assertIsDisplayed()
 
-    // Quick Actions -> Screen Lock Settings opens Android Security Settings cleanly
+    // Quick Actions omits Screen Lock Settings cleanly and still provides Default Home switcher
     composeTestRule.onNodeWithTag("home_quick_actions_button").performTouchInput { longClick() }
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("qa_lock_settings").assertIsDisplayed().performClick()
+    composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("qa_lock_settings").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("qa_default_home").assertIsDisplayed()
+    composeTestRule.runOnUiThread {
+      activity.onBackPressedDispatcher.onBackPressed()
+    }
     composeTestRule.waitForIdle()
-    val startedIntent = shadowOf(activity).nextStartedActivity
-    assertEquals(Settings.ACTION_SECURITY_SETTINGS, startedIntent?.action)
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertDoesNotExist()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
   }
@@ -307,8 +310,8 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("walkthrough_overlay").assertIsDisplayed()
     composeTestRule.onNodeWithTag("walkthrough_step_counter", useUnmergedTree = true).assertIsDisplayed()
 
-    // Step forward through all 6 steps and finish
-    repeat(5) {
+    // Step forward through all 5 steps (music widget temporarily removed from tour) and finish
+    repeat(4) {
       composeTestRule.onNodeWithTag("walkthrough_next_button").performClick()
       composeTestRule.waitForIdle()
     }
@@ -359,11 +362,12 @@ class LauncherUiRobolectricTest {
       composeTestRule.waitForIdle()
     }
 
-    // Subtle Hold ⏻ for Preferences hint appears cleanly above the Power icon
+    // Subtle Hold ⏻ for Quick Actions hint appears cleanly above the Power icon
     composeTestRule.waitUntil(timeoutMillis = 10_000L) {
       composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag("power_hold_hint_pill").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Hold ⏻ for Quick Actions").assertIsDisplayed()
 
     // Tapping the hint action opens Quick Actions and permanently marks Quick Actions as discovered
     composeTestRule.onNodeWithTag("power_hold_hint_action").assertIsDisplayed().performClick()

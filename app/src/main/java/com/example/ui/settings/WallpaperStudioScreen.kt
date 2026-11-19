@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -114,6 +115,8 @@ fun WallpaperStudioScreen(
             text = stringResource(R.string.wallpaper_title),
             fontFamily = FunctionalSansFontFamily,
             fontSize = 22.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = MistColors.OffWhite
           )
         }
@@ -157,7 +160,10 @@ fun WallpaperStudioScreen(
             Text(
               text = "Choose Photo",
               fontFamily = FunctionalSansFontFamily,
-              fontSize = 13.5.sp
+              fontSize = 13.5.sp,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis
             )
           }
 
@@ -176,7 +182,10 @@ fun WallpaperStudioScreen(
               Text(
                 text = "Restore Forest",
                 fontFamily = FunctionalSansFontFamily,
-                fontSize = 13.5.sp
+                fontSize = 13.5.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
               )
             }
           }

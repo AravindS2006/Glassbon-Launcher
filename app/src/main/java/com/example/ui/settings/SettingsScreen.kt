@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
@@ -138,7 +139,10 @@ fun SettingsScreen(
           text = stringResource(R.string.settings_title),
           fontFamily = FunctionalSansFontFamily,
           fontSize = 24.sp,
-          color = MistColors.OffWhite
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          color = MistColors.OffWhite,
+          modifier = Modifier.weight(1f)
         )
       }
 
@@ -366,8 +370,12 @@ fun SettingsScreen(
           )
           DividerLine()
           NavigationPreferenceRow(
-            title = "Default Home Application",
-            subtitle = if (uiState.isDefaultLauncher) "Glassbon is currently default" else "Tap to set Glassbon as default Home",
+            title = if (uiState.isDefaultLauncher) "Change Default Home App" else "Default Home Application",
+            subtitle = if (uiState.isDefaultLauncher) {
+              "Glassbon is active — tap to switch to another launcher"
+            } else {
+              "Tap to set Glassbon as default Home"
+            },
             testTag = "settings_default_home_row",
             onClick = onRequestDefaultHome
           )
@@ -425,6 +433,7 @@ private fun SectionBlock(
       modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
     )
     GlassSurface(
+      modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(18.dp),
       backgroundColor = Color(0x99171719)
     ) {
@@ -622,6 +631,8 @@ private fun <T> SegmentedPreferenceRow(
             text = label(option),
             fontFamily = FunctionalSansFontFamily,
             fontSize = 12.5.sp,
+            maxLines = 1,
+            softWrap = false,
             color = if (isSelected) MistColors.NearBlack else MistColors.OffWhite
           )
         }

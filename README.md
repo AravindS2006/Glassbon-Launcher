@@ -43,19 +43,17 @@
   - Edge-to-edge grayscale misty alpine forest wallpaper (or any personal photo via Android's zero-permission **Photo Picker**) with off-thread `RGB_565` bitmap caching.
   - **Adaptive Multi-Zone Luminance Contrast**: Samples top, middle, and side-edge wallpaper luminance once off-thread (`12×12` grid) to adjust status bar icons, clock/date ink, right-edge contrast scrims, and favorite icon backing automatically.
   - **Unified Clock & Frosted Calendar Pill**: Styled in **Plus Jakarta Sans** or **Instrument Serif**; tap time to open Alarms/Clock or tap the frosted date pill to launch Calendar.
-- **Dual-Edge Curved Alphabet Wave**
-  - Scrub vertically along the visible **Right A–Z Rail** *or* touch/drag the **Hidden Left Edge** (`28.dp` outer gutter protects favorites from accidental taps).
-  - At rest, the hidden left wave composes **zero** child nodes (`0%` idle GPU/CPU cost). Touching wakes a curved Gaussian arc wave and floating circular frosted bubble (`★` Favorites → `A–Z` → `#`).
+- **Single Shared Dual-Edge Curved Alphabet Wave**
+  - Only **one** 28-letter curved Gaussian A–Z rail is composed—touching or sliding along either the visible **Right A–Z Rail** *or* the lightweight 1-node **Hidden Left Edge** sensor drives the exact same alphabetic drawer list (`28.dp` outer gutter protects favorites from accidental taps).
   - Only alphabet edges open the App Library (and swiping down in the drawer returns smoothly to Home)—direct vertical swipes on Home remain calm and deliberate.
 - **Compact Frosted Squircles & Pop-Up App Preview**
-  - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights and corner-sampled background suppression.
+  - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights, package-resource-safe icon cloning, and multi-source fallback rendering so installed apps never lose their icon.
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
-  - **Drawer Alphabet Centering & Focus Blur (`Off` / `Soft` / `Frosted` / `Deep`)**: Selecting or scrubbing an alphabet centers its apps vertically while subtly blurring non-selected sections via a single drawer-cached bounded `BlurEffect` that automatically bypasses blur while actively scrolling or scrubbing for silky 60–120 FPS motion.
-- **Smart Audio Media Capsule**
-  - Automatically expands beneath Clock/Date using zero-permission `AudioManager` hardware media key events (`KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` / `PREVIOUS`) while audio plays, then collapses cleanly when idle.
-- **Adaptive Lock Screen & Preferences Control, Sculpted Haptics & Zero Manifest Permissions**
-  - **Auto-Detection & Adaptive Fallback**: During startup, foreground resume, and package install/uninstall events, Glassbon automatically detects installed OEM or Play Store Android Lock Screen utilities (`LockScreenAppHelper`). When linked, the bottom-right button shows a **Power (`⏻`)** icon that launches your Lock app; if no Lock app is installed on the device, it seamlessly transforms into a **Settings (`⚙`)** icon so tapping opens **Glassbon Preferences** directly.
-  - **Tour-Skip Friendly Discovery**: Users who skip the guided tour still see a self-dismissing frosted `"Hold ⏻ for Preferences"` callout above the Power button until Quick Actions or Preferences are opened.
+  - **Smooth Drawer Alphabet Centering & Focus Blur (`Off` / `Soft` / `Frosted` / `Deep`)**: Selecting or sliding an alphabet glides smoothly at 60–120 FPS to center its apps vertically with GPU-only depth lift/recede while settling a single drawer-cached bounded `BlurEffect` on neighboring sections with zero scroll jank.
+- **Adaptive Lock Screen & Quick Actions Control, Home Switcher & Zero Manifest Permissions**
+  - **Auto-Detection & Adaptive Fallback**: During startup, foreground resume, and package install/uninstall events, Glassbon automatically detects installed OEM or Play Store Android Lock Screen utilities (`LockScreenAppHelper`). When linked, the bottom-right button shows a **Power (`⏻`)** icon that launches your Lock app; if no Lock app is installed on the device, it seamlessly transforms into a **Settings (`⚙`)** icon so tapping opens **Glassbon Preferences** directly. **Press & hold** the button anytime to open **Quick Actions**.
+  - **Tour-Skip Friendly Discovery**: Users who skip the guided tour still see a self-dismissing frosted `"Hold ⏻ for Quick Actions"` callout above the bottom-right button until Quick Actions is opened.
+  - **Default Home Switcher**: Once Glassbon is set as your default Home app, both **Quick Actions → Change Home App** and **Preferences → Change Default Home App** open Android's Home selector so you can switch back to any other launcher anytime.
   - **Performance Modes (`Ultra-Smooth` vs. `Low Power`)**: Switch between full prewarmed icons, 120Hz springs & frosted drawer blur, or **Low Power** mode which halves bitmap decode cost, skips icon prewarming, shrinks cache allocations, snaps transitions, and disables blur shaders for near-zero battery & CPU impact.
   - **Sculpted Tactile Haptics (`MistHaptics`)**: Zero-permission `HapticFeedbackConstants` cues with **Subtle**, **Balanced**, and **Crisp** profiles across curved wave detents, drawer swipe-down return, context pop-ups, and app launches.
   - Ships with **zero `<uses-permission>` declarations** — no `WRITE_SETTINGS`, `INTERNET`, `VIBRATE`, `BIND_ACCESSIBILITY_SERVICE`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`, `REQUEST_DELETE_PACKAGES`, SMS, or broad storage permissions.
@@ -72,22 +70,21 @@
 | :--- | :--- | :--- |
 | **Wallpaper & Blur** | Static `RGB_565` downscaled bitmaps + scroll-bypassed single `BlurEffect` (zeroed in **Low Power**) | Zero per-frame blur recomposition overhead |
 | **Luminance Contrast** | Single `12×12` pixel grid sample on `Dispatchers.IO` upon wallpaper change | Cached boolean flags; zero runtime polling |
-| **Hidden Left Wave** | Transparent `30.dp` touch strip at rest; 28-letter Gaussian arc composes only during drag | `0%` idle CPU/GPU composition cost |
+| **Left Edge Sensor** | Lightweight 1-node `28.dp` touch strip driving the single shared right A–Z rail controller | Zero duplicate 28-letter composition cost |
 | **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; snapped in **Low Power** / **Reduced Motion** |
-| **Clock & Media** | Event-driven `ACTION_TIME_TICK` & `AudioManager` media keys bound to `onStart`/`onStop` | Zero background loops, listeners, or timers |
+| **Clock & Guided Tour** | Event-driven `ACTION_TIME_TICK`; `WalkthroughOverlay` is only composed while explicitly open | Zero background loops, listeners, or idle overhead |
 
 ---
 
 ## Interactive In-App Walkthrough
 
-Glassbon includes a built-in **6-Step Interactive Feature Tour** (`WalkthroughOverlay`) featuring swipeable frosted glass cards and live spatial edge/corner anchor beacons:
+Glassbon includes a lightweight **5-Step Interactive Feature Tour** (`WalkthroughOverlay`) composed strictly on demand (`0%` overhead when closed) featuring swipeable frosted glass cards and live spatial edge/corner anchor beacons:
 
 1. **Pure Calm, Zero Battery Drain** — Static cached frosting & zero polling overview.
 2. **Unified Clock & Calendar Pill** — Tap targets & adaptive wallpaper contrast.
-3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc A–Z scrubbing.
+3. **Dual-Edge Curved Wave** — Hidden left-edge & right-arc scrubbing driving the single shared alphabetic drawer list.
 4. **Compact Icons & Pop-Up Preview** — Outer gutter layout & long-press preview menu.
-5. **Smart Audio Media Capsule** — Space-reclaiming zero-permission playback card.
-6. **Adaptive Power & Preferences** — Bottom-right control that launches your auto-detected Android Lock Screen app with sculpted haptic feedback (or opens Preferences directly when none is installed), and opens Quick Actions on hold.
+5. **Adaptive Power & Quick Actions** — Bottom-right control that launches your auto-detected Android Lock Screen app with sculpted haptic feedback (or opens Preferences directly when none is installed), and opens Quick Actions on hold.
 
 Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Preferences → Guide → Interactive Feature Tour**.
 

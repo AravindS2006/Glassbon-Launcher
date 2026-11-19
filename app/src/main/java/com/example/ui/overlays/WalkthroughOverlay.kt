@@ -35,7 +35,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Gesture
-import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Button
@@ -59,6 +58,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -75,7 +75,6 @@ private enum class SpatialAnchor {
   TOP_LEFT,
   BOTH_EDGES,
   LEFT_GUTTER,
-  TOP_MID,
   BOTTOM_RIGHT
 }
 
@@ -93,7 +92,7 @@ private val WALKTHROUGH_STEPS = listOf(
     badge = "Atmosphere & Efficiency",
     title = "Pure Calm, Zero Battery Drain",
     description = "Glassbon caches pre-scaled wallpapers and frosted drawer layers off the main thread so your Home screen stays featherlight with zero background polling.",
-    tip = "Tip: Press & hold the bottom-right button anytime to open Preferences & Quick Actions.",
+    tip = "Tip: Press & hold the bottom-right button anytime to open Quick Actions.",
     icon = Icons.Outlined.BatteryChargingFull,
     anchor = SpatialAnchor.CENTER
   ),
@@ -108,8 +107,8 @@ private val WALKTHROUGH_STEPS = listOf(
   WalkthroughStep(
     badge = "Left & Right Edges",
     title = "Dual-Edge Curved Wave",
-    description = "Swipe or touch along the visible right A–Z rail—or the hidden left edge—to bloom curved Gaussian letters and glide directly to any app.",
-    tip = "Direct vertical swipes stay calm; only the alphabet rails open App Library.",
+    description = "Swipe or touch along the visible right A–Z rail—or the hidden left edge—to glide the single alphabetic drawer list directly to any app.",
+    tip = "Direct vertical swipes stay calm; only the edge rails open App Library.",
     icon = Icons.Outlined.Gesture,
     anchor = SpatialAnchor.BOTH_EDGES
   ),
@@ -122,18 +121,10 @@ private val WALKTHROUGH_STEPS = listOf(
     anchor = SpatialAnchor.LEFT_GUTTER
   ),
   WalkthroughStep(
-    badge = "Dynamic Layout",
-    title = "Smart Audio Media Capsule",
-    description = "When music or podcasts play, a frosted media card expands smoothly beneath the clock using hardware media keys. When paused or stopped, that space returns to Home.",
-    tip = "Zero sensitive notification permissions required.",
-    icon = Icons.Outlined.MusicNote,
-    anchor = SpatialAnchor.TOP_MID
-  ),
-  WalkthroughStep(
     badge = "Bottom-Right Control",
-    title = "Adaptive Power & Preferences",
+    title = "Adaptive Power & Quick Actions",
     description = "Tap the bottom-right button to launch your auto-detected Lock Screen app—or open Glassbon Preferences directly if no Lock app is installed. Press & hold anytime for Quick Actions.",
-    tip = "Automatically links installed Lock Screen apps and adapts the icon in real time.",
+    tip = "Hold the bottom-right button anytime to open Quick Actions.",
     icon = Icons.Rounded.PowerSettingsNew,
     anchor = SpatialAnchor.BOTTOM_RIGHT
   )
@@ -198,8 +189,9 @@ fun WalkthroughOverlay(
     Box(
       modifier = Modifier
         .align(Alignment.Center)
-        .padding(horizontal = 24.dp)
-        .widthIn(min = 280.dp, max = 420.dp)
+        .padding(horizontal = 16.dp)
+        .fillMaxWidth()
+        .widthIn(max = 420.dp)
         .graphicsLayer {
           val p = reveal.value
           alpha = p.coerceIn(0f, 1f)
@@ -237,6 +229,8 @@ fun WalkthroughOverlay(
               fontWeight = FontWeight.SemiBold,
               fontSize = 10.5.sp,
               letterSpacing = 0.9.sp,
+              maxLines = 1,
+              softWrap = false,
               color = MistColors.OffWhite,
               modifier = Modifier.testTag("walkthrough_step_counter")
             )
@@ -255,6 +249,8 @@ fun WalkthroughOverlay(
               text = stringResource(R.string.tour_skip),
               fontFamily = FunctionalSansFontFamily,
               fontSize = 13.sp,
+              maxLines = 1,
+              softWrap = false,
               color = MistColors.MistGrey
             )
           }
@@ -298,7 +294,10 @@ fun WalkthroughOverlay(
                 fontWeight = FontWeight.Medium,
                 fontSize = 11.sp,
                 letterSpacing = 1.0.sp,
-                color = MistColors.MistGrey.copy(alpha = 0.85f)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MistColors.MistGrey.copy(alpha = 0.85f),
+                modifier = Modifier.weight(1f)
               )
             }
 
@@ -406,6 +405,8 @@ fun WalkthroughOverlay(
                 text = stringResource(R.string.tour_back),
                 fontFamily = FunctionalSansFontFamily,
                 fontSize = 13.sp,
+                maxLines = 1,
+                softWrap = false,
                 color = MistColors.OffWhite
               )
             }
@@ -441,7 +442,9 @@ fun WalkthroughOverlay(
               text = stringResource(if (isLastStep) R.string.tour_finish else R.string.tour_next),
               fontFamily = FunctionalSansFontFamily,
               fontWeight = FontWeight.SemiBold,
-              fontSize = 13.sp
+              fontSize = 13.sp,
+              maxLines = 1,
+              softWrap = false
             )
             if (!isLastStep) {
               Spacer(modifier = Modifier.width(6.dp))
@@ -509,21 +512,12 @@ private fun SpatialAnchorBeacons(anchor: SpatialAnchor) {
         )
       }
 
-      SpatialAnchor.TOP_MID -> {
-        SpatialBeaconPill(
-          label = "Dynamic Media Capsule Zone",
-          modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(start = 24.dp, top = 86.dp)
-        )
-      }
-
       SpatialAnchor.BOTTOM_RIGHT -> {
         SpatialBeaconPill(
-          label = "Power / Preferences · Hold for Actions",
+          label = "Power / Preferences · Hold for Quick Actions",
           modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(end = 22.dp, bottom = 78.dp)
+            .padding(start = 16.dp, end = 22.dp, bottom = 78.dp)
         )
         Box(
           modifier = Modifier
@@ -555,6 +549,8 @@ private fun SpatialBeaconPill(
       fontFamily = FunctionalSansFontFamily,
       fontWeight = FontWeight.Medium,
       fontSize = 11.5.sp,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
       color = MistColors.PureWhite
     )
   }

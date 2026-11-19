@@ -17,6 +17,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -79,13 +82,15 @@ import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.ClockView
 import com.example.ui.components.FloatingCircleButton
 import com.example.ui.components.GlassSurface
+import com.example.ui.components.LeftAlphabetEdgeSensor
 import com.example.ui.components.LiquidMediaCard
 import com.example.ui.components.MistAppIcon
+import com.example.ui.components.rememberAlphabetRailController
 import com.example.ui.theme.FunctionalSansFontFamily
 import com.example.ui.theme.MistColors
 import com.example.ui.theme.appLabelTextStyle
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
   uiState: LauncherUiState,
@@ -115,6 +120,7 @@ fun HomeScreen(
 ) {
   val prefs = uiState.preferences
   val haptics = LocalMistHaptics.current
+  val homeRailController = rememberAlphabetRailController()
 
   val availableSections = remember(uiState.sections) {
     uiState.sections.map { it.header }.toSet()
@@ -275,7 +281,7 @@ fun HomeScreen(
       }
     }
 
-    // Left-edge hidden mirrored curved Alphabet Rail (0% idle draw cost; hidden once drawer opens unless actively dragging left edge)
+    // Left-edge single-Box touch sensor driving the SAME single shared Home A-Z wave & drawer controller
     val showHomeLeftRail = prefs.showLeftHiddenAlphabet &&
       (!uiState.isDrawerOpen || activeHomeScrubSide == AlphabetRailSide.LEFT)
     if (showHomeLeftRail) {
@@ -287,15 +293,9 @@ fun HomeScreen(
           .testTag("home_left_alphabet_rail_container"),
         contentAlignment = Alignment.CenterStart
       ) {
-        AlphabetRail(
-          availableSections = availableSections,
-          activeKeyProvider = { null },
-          hasFavorites = uiState.favoriteApps.isNotEmpty(),
+        LeftAlphabetEdgeSensor(
+          controller = homeRailController,
           hapticEnabled = prefs.hapticFeedback,
-          side = AlphabetRailSide.LEFT,
-          invisibleMode = true,
-          reducedMotion = prefs.effectiveReducedMotion,
-          useSansBubble = useSans,
           onSelectKey = { onScrubToDrawerSection(it, AlphabetRailSide.LEFT) },
           onDragPullChanged = onScrubPullChanged,
           onContinuousScrub = onContinuousScrub,
@@ -304,8 +304,10 @@ fun HomeScreen(
       }
     }
 
-    // Right-edge curved Alphabet Rail (strict mutual exclusion with AppDrawerScreen's right rail -> never 2 rails!)
-    val showHomeRightRail = !uiState.isDrawerOpen || activeHomeScrubSide == AlphabetRailSide.RIGHT
+    // Single right-edge curved Alphabet Rail (shared with left-edge sensor; mutually exclusive with Drawer's rail)
+    val showHomeRightRail = !uiState.isDrawerOpen ||
+      activeHomeScrubSide == AlphabetRailSide.RIGHT ||
+      activeHomeScrubSide == AlphabetRailSide.LEFT
     if (showHomeRightRail) {
       Box(
         modifier = Modifier
@@ -316,6 +318,7 @@ fun HomeScreen(
         contentAlignment = Alignment.CenterEnd
       ) {
         AlphabetRail(
+          controller = homeRailController,
           availableSections = availableSections,
           activeKeyProvider = { null },
           hasFavorites = uiState.favoriteApps.isNotEmpty(),
@@ -340,7 +343,7 @@ fun HomeScreen(
       GlassSurface(
         modifier = Modifier
           .align(Alignment.BottomStart)
-          .padding(start = 28.dp, end = 92.dp, bottom = 6.dp)
+          .padding(start = 20.dp, end = 84.dp, bottom = 6.dp)
           .widthIn(max = 320.dp)
           .graphicsLayer {
             val p = drawerProgressProvider()
@@ -349,7 +352,7 @@ fun HomeScreen(
           .testTag("default_home_onboarding"),
         shape = RoundedCornerShape(18.dp)
       ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
           Text(
             text = stringResource(
               if (needsDefaultPrompt) R.string.onboarding_title else R.string.onboarding_tour_only_title
@@ -369,13 +372,17 @@ fun HomeScreen(
             color = MistColors.MistGrey.copy(alpha = 0.85f)
           )
           Spacer(modifier = Modifier.height(6.dp))
-          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+          ) {
             if (!prefs.walkthroughCompleted) {
               TextButton(
                 onClick = {
                   haptics.trigger(MistHapticEvent.CONFIRM)
                   onStartTour()
                 },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 modifier = Modifier
                   .heightIn(min = 36.dp)
                   .testTag("home_start_tour_button")
@@ -384,6 +391,8 @@ fun HomeScreen(
                   text = stringResource(R.string.onboarding_start_tour),
                   fontFamily = FunctionalSansFontFamily,
                   fontSize = 12.sp,
+                  maxLines = 1,
+                  softWrap = false,
                   color = MistColors.PureWhite
                 )
               }
@@ -394,6 +403,7 @@ fun HomeScreen(
                   haptics.trigger(MistHapticEvent.CONFIRM)
                   onRequestDefaultHome()
                 },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 modifier = Modifier
                   .heightIn(min = 36.dp)
                   .testTag("onboarding_set_default_button")
@@ -402,6 +412,8 @@ fun HomeScreen(
                   text = stringResource(R.string.onboarding_cta),
                   fontFamily = FunctionalSansFontFamily,
                   fontSize = 12.sp,
+                  maxLines = 1,
+                  softWrap = false,
                   color = MistColors.PureWhite
                 )
               }
@@ -411,6 +423,7 @@ fun HomeScreen(
                 haptics.trigger(MistHapticEvent.TAP_LIGHT)
                 onDismissOnboarding()
               },
+              contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
               modifier = Modifier
                 .heightIn(min = 36.dp)
                 .testTag("onboarding_dismiss_button")
@@ -419,6 +432,8 @@ fun HomeScreen(
                 text = stringResource(R.string.onboarding_dismiss),
                 fontFamily = FunctionalSansFontFamily,
                 fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
                 color = MistColors.FrostedGrey
               )
             }
@@ -430,17 +445,16 @@ fun HomeScreen(
     val hasLinkedLockApp = uiState.linkedLockApp != null
     val isAdaptiveSettingsFallback = prefs.quickActionMode == QuickActionMode.LOCK_SCREEN && !hasLinkedLockApp
 
-    // Self-dismissing frosted tip above Power icon when user skips/dismisses tour before discovering long-press
+    // Self-dismissing frosted tip above Power/Settings icon when user skips/dismisses tour before discovering long-press
     val showPowerHoldHint = !showOnboardingPill &&
       !uiState.isDrawerOpen &&
       prefs.quickActionMode == QuickActionMode.LOCK_SCREEN &&
-      hasLinkedLockApp &&
       !prefs.quickActionsDiscovered
     if (showPowerHoldHint) {
       GlassSurface(
         modifier = Modifier
           .align(Alignment.BottomEnd)
-          .padding(end = 22.dp, bottom = 64.dp)
+          .padding(start = 16.dp, end = 22.dp, bottom = 64.dp)
           .graphicsLayer {
             val p = drawerProgressProvider()
             alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
@@ -454,6 +468,7 @@ fun HomeScreen(
           Box(
             contentAlignment = Alignment.CenterStart,
             modifier = Modifier
+              .weight(1f, fill = false)
               .heightIn(min = 48.dp)
               .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -467,10 +482,15 @@ fun HomeScreen(
               .testTag("power_hold_hint_action")
           ) {
             Text(
-              text = stringResource(R.string.power_hold_hint),
+              text = stringResource(
+                if (hasLinkedLockApp) R.string.power_hold_hint else R.string.power_hold_settings_hint
+              ),
               fontFamily = FunctionalSansFontFamily,
               fontWeight = FontWeight.Medium,
               fontSize = 11.5.sp,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
               color = MistColors.OffWhite
             )
           }

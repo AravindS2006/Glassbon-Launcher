@@ -236,7 +236,7 @@ fun LauncherRoot(
         iconCache = iconCache,
         drawerJumpEvents = viewModel.drawerJumpEvents,
         drawerContinuousScrubEvents = viewModel.drawerContinuousScrubEvents,
-        hideRightAlphabetRail = activeHomeScrubSide == AlphabetRailSide.RIGHT,
+        hideRightAlphabetRail = activeHomeScrubSide != null,
         hideLeftAlphabetRail = activeHomeScrubSide == AlphabetRailSide.LEFT,
         homeScrubPullProvider = { homeScrubPullRatio.floatValue },
         onJumpTargetHandled = { viewModel.updateDrawerJumpTarget(null) },
@@ -392,7 +392,6 @@ fun LauncherRoot(
         linkedLockAppLabel = uiState.linkedLockApp?.label,
         reducedMotion = prefs.effectiveReducedMotion,
         onLockScreen = { viewModel.triggerScreenLock(context) },
-        onOpenLockScreenSettings = { viewModel.openLockScreenSettings(context) },
         onOpenLibrary = { viewModel.openDrawer(withSearch = false) },
         onOpenSearch = { viewModel.openDrawer(withSearch = true) },
         onOpenWallpaper = { viewModel.openOverlay(LauncherOverlay.WALLPAPER_STUDIO) },
@@ -533,8 +532,9 @@ private fun LockAppPickerDialog(
       shape = RoundedCornerShape(24.dp),
       backgroundColor = Color(0xEC16171B),
       modifier = Modifier
-        .padding(horizontal = 20.dp, vertical = 28.dp)
-        .widthIn(min = 290.dp, max = 440.dp)
+        .padding(horizontal = 16.dp, vertical = 28.dp)
+        .fillMaxWidth()
+        .widthIn(max = 440.dp)
         .heightIn(max = 580.dp)
         .testTag("lock_app_picker_dialog")
     ) {
@@ -720,6 +720,8 @@ private fun LockAppPickerDialog(
             text = stringResource(R.string.lock_dialog_open_security_settings),
             fontFamily = FunctionalSansFontFamily,
             fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = MistColors.OffWhite
           )
         }

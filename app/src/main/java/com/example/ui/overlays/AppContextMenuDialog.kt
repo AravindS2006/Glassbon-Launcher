@@ -118,7 +118,8 @@ fun AppContextMenuDialog(
   ) {
     Box(
       modifier = Modifier
-        .widthIn(min = 272.dp, max = 336.dp)
+        .fillMaxWidth()
+        .widthIn(max = 336.dp)
         .graphicsLayer {
           val p = reveal.value
           alpha = p.coerceIn(0f, 1f)
@@ -179,6 +180,8 @@ fun AppContextMenuDialog(
                   fontFamily = FunctionalSansFontFamily,
                   fontWeight = FontWeight.Medium,
                   fontSize = 10.sp,
+                  maxLines = 1,
+                  softWrap = false,
                   color = MistColors.OffWhite.copy(alpha = 0.88f)
                 )
               }
@@ -292,7 +295,10 @@ private fun ContextActionRow(
       text = label,
       fontFamily = FunctionalSansFontFamily,
       fontSize = 14.sp,
-      color = MistColors.OffWhite
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      color = MistColors.OffWhite,
+      modifier = Modifier.weight(1f)
     )
   }
 }

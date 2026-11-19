@@ -98,7 +98,10 @@ fun HiddenAppsScreen(
             EditorialDisplayFontFamily
           },
           fontSize = 24.sp,
-          color = MistColors.OffWhite
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          color = MistColors.OffWhite,
+          modifier = Modifier.weight(1f)
         )
       }
 

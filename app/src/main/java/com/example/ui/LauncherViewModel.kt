@@ -712,13 +712,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         activeOverlay = LauncherOverlay.NONE,
         contextMenuApp = null,
         showWalkthrough = true,
-        walkthroughStep = initialStep.coerceIn(0, 5)
+        walkthroughStep = initialStep.coerceIn(0, 4)
       )
     }
   }
 
   fun setWalkthroughStep(step: Int) {
-    transientState.update { it.copy(walkthroughStep = step.coerceIn(0, 5)) }
+    transientState.update { it.copy(walkthroughStep = step.coerceIn(0, 4)) }
   }
 
   fun finishWalkthrough() {

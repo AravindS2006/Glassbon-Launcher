@@ -3,7 +3,8 @@
     <string name="cd_home_wallpaper">Minimalist atmospheric wallpaper</string>
     <string name="cd_open_quick_actions">Lock screen or hold for quick actions</string>
     <string name="cd_open_preferences_or_quick_actions">Open Glassbon preferences or hold for quick actions</string>
-    <string name="power_hold_hint">Hold ⏻ for Preferences</string>
+    <string name="power_hold_hint">Hold ⏻ for Quick Actions</string>
+    <string name="power_hold_settings_hint">Hold ⚙ for Quick Actions</string>
     <string name="cd_dismiss_hint">Dismiss hint</string>
     <string name="cd_open_search">Search applications</string>
     <string name="cd_clear_search">Clear search</string>
@@ -16,8 +17,8 @@
     <string name="cd_media_next">Next track</string>
     <string name="onboarding_title">Set Glassbon as your Home</string>
     <string name="onboarding_tour_only_title">Explore Glassbon</string>
-    <string name="onboarding_body">Make Glassbon default Home. Hold bottom-right ⏻ anytime for Preferences.</string>
-    <string name="onboarding_tour_only_body">Take a quick tour of wave scrubbing &amp; gestures, or hold bottom-right ⏻ anytime for Preferences.</string>
+    <string name="onboarding_body">Make Glassbon default Home. Hold bottom-right button anytime for Quick Actions.</string>
+    <string name="onboarding_tour_only_body">Take a quick tour of wave scrubbing &amp; gestures, or hold bottom-right button anytime for Quick Actions.</string>
     <string name="onboarding_cta">Set Default</string>
     <string name="onboarding_start_tour">Take Tour</string>
     <string name="onboarding_dismiss">Later</string>
@@ -36,6 +37,7 @@
     <string name="action_interactive_tour">Guided Feature Tour</string>
     <string name="action_system_settings">Device Settings</string>
     <string name="action_set_default_home">Default Home App</string>
+    <string name="action_change_default_home">Change Home App</string>
     <string name="action_add_favorite">Add to Favorites</string>
     <string name="action_remove_favorite">Remove from Favorites</string>
     <string name="action_move_up">Move Earlier</string>
@@ -50,7 +52,7 @@
     <string name="tour_skip">Skip</string>
     <string name="tour_back">Back</string>
     <string name="tour_next">Next</string>
-    <string name="tour_finish">Start Using Glassbon</string>
+    <string name="tour_finish">Get Started</string>
     <string name="lock_app_dialog_title">Link Lock Screen App</string>
     <string name="lock_app_dialog_body">Choose an installed Android Lock Screen or Screen Off utility to launch when you tap the bottom-right lock button. Glassbon runs with zero background permissions.</string>
     <string name="lock_dialog_open_security_settings">Android Lock Screen Settings</string>

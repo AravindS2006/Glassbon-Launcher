@@ -292,6 +292,11 @@ class DrawerAlphabetJumpRobolectricTest {
         wpState.wallpaper.drawerBlurredBitmap
       )
       composeTestRule.onNodeWithTag("settings_back_button").performClick()
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        composeTestRule.onAllNodesWithTag("settings_screen").fetchSemanticsNodes().isEmpty() &&
+          composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
+            .fetchSemanticsNodes().isNotEmpty()
+      }
       composeTestRule.waitForIdle()
 
       // Jump to G -> centered cleanly, but zero blur FBOs allocated on neighbor rows

@@ -115,7 +115,9 @@ import com.example.ui.components.AlphabetRailSide
 import com.example.ui.components.FAVORITES_INDEX_KEY
 import com.example.ui.components.FloatingCircleButton
 import com.example.ui.components.GlassSurface
+import com.example.ui.components.LeftAlphabetEdgeSensor
 import com.example.ui.components.MistAppIcon
+import com.example.ui.components.rememberAlphabetRailController
 import com.example.ui.theme.EditorialDisplayFontFamily
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.FunctionalSansFontFamily
@@ -157,7 +159,8 @@ fun AppDrawerScreen(
   val density = LocalDensity.current
   val haptics = LocalMistHaptics.current
 
-  // Smooth horizontal clearance ONLY for left-edge wave (never push apps off the left edge of the screen!)
+  val railController = rememberAlphabetRailController()
+  // Smooth horizontal clearance ONLY for left-edge scrub gesture (zero duplicate left 28-letter column)
   var draggingSide by remember { mutableStateOf<AlphabetRailSide?>(null) }
   val drawerScrubPullState = remember { mutableFloatStateOf(0f) }
   val listDragShiftX = remember { Animatable(0f) }
@@ -480,10 +483,10 @@ fun AppDrawerScreen(
     )
   }
 
-  suspend fun scrollToCenteredSection(sectionKey: String) {
+  suspend fun refineCenteredSectionOffset(sectionKey: String) {
     val target = computeCenteredTarget(sectionKey) ?: return
-    listState.scrollToItem(target.anchorIndex, target.anchorOffsetPx)
     if (listState.layoutInfo.visibleItemsInfo.none { it.index == target.startIndex }) {
+      listState.scrollToItem(target.anchorIndex, target.anchorOffsetPx)
       withFrameNanos { }
     }
     val visible = listState.layoutInfo.visibleItemsInfo
@@ -497,11 +500,29 @@ fun AppDrawerScreen(
       if (viewportH > 0) {
         val desiredTop = ((viewportH - measuredSectionH) / 2f).roundToInt().coerceAtLeast(0)
         val delta = (headerItem.offset - desiredTop).toFloat()
-        if (abs(delta) > 1.5f) {
+        if (abs(delta) > 2f) {
           listState.scroll { scrollBy(delta) }
         }
       }
     }
+  }
+
+  suspend fun scrollToCenteredSection(sectionKey: String) {
+    val target = computeCenteredTarget(sectionKey) ?: return
+    listState.scrollToItem(target.anchorIndex, target.anchorOffsetPx)
+    if (listState.layoutInfo.visibleItemsInfo.none { it.index == target.startIndex }) {
+      withFrameNanos { }
+    }
+    refineCenteredSectionOffset(sectionKey)
+  }
+
+  fun requestSmoothScrollToSection(sectionKey: String) {
+    if (uiState.drawerRows.isEmpty() || sectionIndexMap.isEmpty()) return
+    val resolved = findNearestSection(sectionKey, sectionIndexMap) ?: return
+    pinnedJumpKeyState.value = resolved.first
+    targetScrubSectionState.value = resolved.first
+    targetContinuousRowState.floatValue = computeCenteredTarget(resolved.first)?.continuousAnchorPos
+      ?: resolved.second.toFloat()
   }
 
   fun resolveAndUpdateContinuousScrub(continuousIdx: Float) {
@@ -557,16 +578,10 @@ fun AppDrawerScreen(
     onJumpTargetHandled()
   }
 
-  // Discrete jump events (taps on Home rail when drawer is open)
+  // Discrete jump events (taps on Home rail when drawer is open) glide smoothly instead of hard-snapping
   LaunchedEffect(drawerJumpEvents, sectionIndexMap) {
     drawerJumpEvents.collect { target ->
-      val resolved = findNearestSection(target, sectionIndexMap)
-      if (resolved != null) {
-        pinnedJumpKeyState.value = resolved.first
-        targetContinuousRowState.floatValue = -1f
-        targetScrubSectionState.value = null
-        scrollToCenteredSection(resolved.first)
-      }
+      requestSmoothScrollToSection(target)
     }
   }
 
@@ -577,7 +592,7 @@ fun AppDrawerScreen(
     }
   }
 
-  // Vsync-paced frame follower: smoothly interpolates between centered alphabet targets at 60-120Hz and refines exact section centering on settle
+  // Vsync-paced frame follower: smoothly glides between centered alphabet targets at 60-120Hz without snapping or composing excessive offscreen rows
   LaunchedEffect(effectiveReducedMotion, uiState.drawerRows.size, sectionIndexMap) {
     if (uiState.drawerRows.isEmpty()) return@LaunchedEffect
 
@@ -607,7 +622,7 @@ fun AppDrawerScreen(
         }
 
         var lastFrameNanos = 0L
-        while (smoothedRow < 0f || abs(clampedTarget - smoothedRow) > 0.005f) {
+        while (smoothedRow < 0f || abs(clampedTarget - smoothedRow) > 0.008f) {
           var pendingScroll: Pair<Int, Int>? = null
           withFrameNanos { frameNanos ->
             if (smoothedRow < 0f) {
@@ -615,12 +630,18 @@ fun AppDrawerScreen(
               val curH = measuredRowHeightPx(curIdx).coerceAtLeast(1f)
               smoothedRow = (curIdx + (listState.firstVisibleItemScrollOffset / curH)).coerceIn(0f, maxRow)
             }
+            // For huge cross-alphabet jumps (> 14 rows), pre-stage ~10 rows away so glide finishes swiftly without composing 100 skipped items
+            val dist = clampedTarget - smoothedRow
+            if (abs(dist) > 14f) {
+              smoothedRow = (clampedTarget - kotlin.math.sign(dist) * 10f).coerceIn(0f, maxRow)
+            }
+
             val dt = if (lastFrameNanos == 0L) 0.016f else {
               ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
             }
-            val factor = 1f - exp(-26f * dt)
+            val factor = 1f - exp(-15f * dt)
             smoothedRow += (clampedTarget - smoothedRow) * factor
-            if (abs(clampedTarget - smoothedRow) <= 0.005f) {
+            if (abs(clampedTarget - smoothedRow) <= 0.008f) {
               smoothedRow = clampedTarget
             }
             lastFrameNanos = frameNanos
@@ -634,7 +655,7 @@ fun AppDrawerScreen(
           }
         }
         targetScrubSectionState.value?.let { settledKey ->
-          scrollToCenteredSection(settledKey)
+          refineCenteredSectionOffset(settledKey)
         }
         targetContinuousRowState.floatValue = -1f
       }
@@ -853,7 +874,7 @@ fun AppDrawerScreen(
             }
           }
 
-          // Left-edge hidden mirrored Alphabet Rail inside the drawer
+          // Left-edge single-Box touch sensor driving the SAME single alphabetic drawer list
           if (prefs.showLeftHiddenAlphabet && uiState.sections.isNotEmpty() && !hideLeftAlphabetRail) {
             Box(
               modifier = Modifier
@@ -862,15 +883,9 @@ fun AppDrawerScreen(
                 .padding(bottom = 68.dp),
               contentAlignment = Alignment.CenterStart
             ) {
-              AlphabetRail(
-                availableSections = availableSections,
-                activeKeyProvider = { activeIndexKeyState.value },
-                hasFavorites = uiState.favoriteApps.isNotEmpty(),
+              LeftAlphabetEdgeSensor(
+                controller = railController,
                 hapticEnabled = prefs.hapticFeedback,
-                side = AlphabetRailSide.LEFT,
-                invisibleMode = true,
-                reducedMotion = effectiveReducedMotion,
-                useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
                   draggingSide = if (dragging) AlphabetRailSide.LEFT else null
                   if (!dragging) drawerScrubPullState.floatValue = 0f
@@ -882,20 +897,17 @@ fun AppDrawerScreen(
                   resolveAndUpdateContinuousScrub(continuousIdx)
                 },
                 onSelectKey = { targetKey ->
-                  val resolved = findNearestSection(targetKey, sectionIndexMap)
-                  if (resolved != null) {
-                    pinnedJumpKeyState.value = resolved.first
-                    targetContinuousRowState.floatValue = -1f
-                    targetScrubSectionState.value = null
-                    coroutineScope.launch { scrollToCenteredSection(resolved.first) }
-                  }
+                  requestSmoothScrollToSection(targetKey)
                 }
               )
             }
           }
 
-          // Right-edge curved vertical alphabet index
-          if (prefs.showAlphabetIndex && uiState.sections.isNotEmpty() && !hideRightAlphabetRail) {
+          // Single right-edge curved vertical alphabet index shared by both edges
+          if ((prefs.showAlphabetIndex || prefs.showLeftHiddenAlphabet) &&
+            uiState.sections.isNotEmpty() &&
+            !hideRightAlphabetRail
+          ) {
             Box(
               modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -904,15 +916,23 @@ fun AppDrawerScreen(
               contentAlignment = Alignment.Center
             ) {
               AlphabetRail(
+                controller = railController,
                 availableSections = availableSections,
                 activeKeyProvider = { activeIndexKeyState.value },
                 hasFavorites = uiState.favoriteApps.isNotEmpty(),
                 hapticEnabled = prefs.hapticFeedback,
                 side = AlphabetRailSide.RIGHT,
+                invisibleMode = !prefs.showAlphabetIndex,
                 reducedMotion = effectiveReducedMotion,
                 useSansBubble = useSans,
                 onDraggingChanged = { dragging ->
-                  draggingSide = if (dragging) AlphabetRailSide.RIGHT else null
+                  draggingSide = if (dragging && draggingSide != AlphabetRailSide.LEFT) {
+                    AlphabetRailSide.RIGHT
+                  } else if (!dragging) {
+                    null
+                  } else {
+                    draggingSide
+                  }
                   if (!dragging) drawerScrubPullState.floatValue = 0f
                 },
                 onDragPullChanged = { pull ->
@@ -922,13 +942,7 @@ fun AppDrawerScreen(
                   resolveAndUpdateContinuousScrub(continuousIdx)
                 },
                 onSelectKey = { targetKey ->
-                  val resolved = findNearestSection(targetKey, sectionIndexMap)
-                  if (resolved != null) {
-                    pinnedJumpKeyState.value = resolved.first
-                    targetContinuousRowState.floatValue = -1f
-                    targetScrubSectionState.value = null
-                    coroutineScope.launch { scrollToCenteredSection(resolved.first) }
-                  }
+                  requestSmoothScrollToSection(targetKey)
                 }
               )
             }
@@ -1018,7 +1032,9 @@ private fun DrawerSectionHeader(
       fontFamily = if (useSans) FunctionalSansFontFamily else EditorialDisplayFontFamily,
       fontSize = if (useSans) 16.sp else 19.sp,
       letterSpacing = 0.7.sp,
-      color = MistColors.PureWhite.copy(alpha = 0.92f)
+      color = MistColors.PureWhite.copy(alpha = 0.92f),
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
     )
   }
 }

@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,6 +69,32 @@ enum class AlphabetRailSide {
   LEFT
 }
 
+/**
+ * Shared controller for the single alphabetic drawer wave.
+ * Both the visible right-edge rail and the lightweight left-edge touch sensor
+ * write into this single state holder so only ONE 28-letter rail is ever composed.
+ */
+@Stable
+class AlphabetRailController(
+  val entries: List<String> = listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS
+) {
+  var railHeightPx: Int by mutableIntStateOf(1)
+  var sensorHeightPx: Int by mutableIntStateOf(1)
+  var isDragging: Boolean by mutableStateOf(false)
+  var pointerY: Float by mutableFloatStateOf(-1f)
+  var smoothedPointerY: Float by mutableFloatStateOf(-1f)
+  var dragPullTarget: Float by mutableFloatStateOf(0f)
+  var lastSelectedIndex: Int by mutableIntStateOf(-1)
+  var scrubbedKey: String? by mutableStateOf(null)
+  val waveStrength = Animatable(0f)
+  val dragStretch = Animatable(0f)
+}
+
+@Composable
+fun rememberAlphabetRailController(): AlphabetRailController {
+  return remember { AlphabetRailController() }
+}
+
 @Composable
 fun AlphabetRail(
   availableSections: Set<String>,
@@ -77,6 +103,7 @@ fun AlphabetRail(
   hapticEnabled: Boolean,
   onSelectKey: (String) -> Unit,
   modifier: Modifier = Modifier,
+  controller: AlphabetRailController = rememberAlphabetRailController(),
   side: AlphabetRailSide = AlphabetRailSide.RIGHT,
   invisibleMode: Boolean = false,
   reducedMotion: Boolean = false,
@@ -87,30 +114,21 @@ fun AlphabetRail(
   onContinuousScrub: ((Float) -> Unit)? = null,
   onDragEnd: () -> Unit = {}
 ) {
-  val entries = remember { listOf(FAVORITES_INDEX_KEY) + AppIndexHelper.ALPHABET_RAIL_LETTERS }
+  val entries = controller.entries
   val haptics = LocalMistHaptics.current
   val density = LocalDensity.current
 
-  val railHeightPxState = remember { mutableIntStateOf(1) }
-  var isDragging by remember { mutableStateOf(false) }
   var isWaveVisible by remember(invisibleMode) { mutableStateOf(!invisibleMode) }
-  val pointerYState = remember { mutableFloatStateOf(-1f) }
-  val smoothedPointerYState = remember { mutableFloatStateOf(-1f) }
-  val dragPullTargetState = remember { mutableFloatStateOf(0f) }
-  var lastSelectedIndex by remember { mutableIntStateOf(-1) }
-  val scrubbedKeyState = remember { mutableStateOf<String?>(null) }
 
-  val waveStrength = remember { Animatable(0f) }
-  val dragStretch = remember { Animatable(0f) }
-
-  LaunchedEffect(isDragging, reducedMotion, invisibleMode) {
-    onDraggingChanged(isDragging)
-    if (isDragging) {
+  LaunchedEffect(controller.isDragging, reducedMotion, invisibleMode) {
+    val dragging = controller.isDragging
+    onDraggingChanged(dragging)
+    if (dragging) {
       isWaveVisible = true
       if (reducedMotion) {
-        waveStrength.snapTo(1f)
+        controller.waveStrength.snapTo(1f)
       } else {
-        waveStrength.animateTo(
+        controller.waveStrength.animateTo(
           targetValue = 1f,
           animationSpec = spring(
             dampingRatio = 0.78f,
@@ -120,49 +138,49 @@ fun AlphabetRail(
       }
     } else {
       if (reducedMotion) {
-        waveStrength.snapTo(0f)
-      } else if (waveStrength.value > 0f) {
-        waveStrength.animateTo(
+        controller.waveStrength.snapTo(0f)
+      } else if (controller.waveStrength.value > 0f) {
+        controller.waveStrength.animateTo(
           targetValue = 0f,
           animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
         )
       }
-      if (invisibleMode && !isDragging) {
+      if (invisibleMode && !controller.isDragging) {
         isWaveVisible = false
       }
     }
   }
 
   // Vsync-paced sideways stretch & vertical wave follower (settles cleanly with 0 idle frame churn)
-  LaunchedEffect(isDragging, reducedMotion) {
-    if (isDragging) {
-      snapshotFlow { pointerYState.floatValue to dragPullTargetState.floatValue }
+  LaunchedEffect(controller.isDragging, reducedMotion) {
+    if (controller.isDragging) {
+      snapshotFlow { controller.pointerY to controller.dragPullTarget }
         .collectLatest { (targetY, targetPull) ->
           if (reducedMotion) {
-            if (targetY >= 0f) smoothedPointerYState.floatValue = targetY
-            dragStretch.snapTo(targetPull)
+            if (targetY >= 0f) controller.smoothedPointerY = targetY
+            controller.dragStretch.snapTo(targetPull)
             return@collectLatest
           }
           var lastFrameNanos = 0L
           while (
-            (targetY >= 0f && (smoothedPointerYState.floatValue < 0f || abs(targetY - smoothedPointerYState.floatValue) > 0.35f)) ||
-            abs(targetPull - dragStretch.value) > 0.002f
+            (targetY >= 0f && (controller.smoothedPointerY < 0f || abs(targetY - controller.smoothedPointerY) > 0.35f)) ||
+            abs(targetPull - controller.dragStretch.value) > 0.002f
           ) {
-            var nextStretch = dragStretch.value
+            var nextStretch = controller.dragStretch.value
             withFrameNanos { frameNanos ->
               val dt = if (lastFrameNanos == 0L) 0.016f else {
                 ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
               }
               val factor = 1f - exp(-26f * dt)
               if (targetY >= 0f) {
-                val curY = smoothedPointerYState.floatValue
-                smoothedPointerYState.floatValue = if (curY < 0f || abs(targetY - curY) <= 0.35f) {
+                val curY = controller.smoothedPointerY
+                controller.smoothedPointerY = if (curY < 0f || abs(targetY - curY) <= 0.35f) {
                   targetY
                 } else {
                   curY + (targetY - curY) * factor
                 }
               }
-              val curStretch = dragStretch.value
+              val curStretch = controller.dragStretch.value
               val diffStretch = targetPull - curStretch
               nextStretch = if (abs(diffStretch) <= 0.002f) {
                 targetPull
@@ -171,17 +189,17 @@ fun AlphabetRail(
               }
               lastFrameNanos = frameNanos
             }
-            dragStretch.snapTo(nextStretch)
+            controller.dragStretch.snapTo(nextStretch)
           }
-          if (targetY >= 0f) smoothedPointerYState.floatValue = targetY
-          dragStretch.snapTo(targetPull)
+          if (targetY >= 0f) controller.smoothedPointerY = targetY
+          controller.dragStretch.snapTo(targetPull)
         }
     } else {
       if (reducedMotion) {
-        dragStretch.snapTo(0f)
-        smoothedPointerYState.floatValue = pointerYState.floatValue
-      } else if (dragStretch.value > 0f) {
-        dragStretch.animateTo(
+        controller.dragStretch.snapTo(0f)
+        controller.smoothedPointerY = controller.pointerY
+      } else if (controller.dragStretch.value > 0f) {
+        controller.dragStretch.animateTo(
           targetValue = 0f,
           animationSpec = spring(
             dampingRatio = 0.76f,
@@ -206,11 +224,11 @@ fun AlphabetRail(
   val bubbleStretchXPx = with(density) { 42.dp.toPx() }
 
   fun dispatchContinuousForY(y: Float, emitSelect: Boolean, emitContinuous: Boolean) {
-    val heightPx = railHeightPxState.intValue
+    val heightPx = controller.railHeightPx
     if (heightPx <= 0) return
     val maxY = (heightPx - verticalPadPx).coerceAtLeast(verticalPadPx)
     val clampedY = y.coerceIn(verticalPadPx, maxY)
-    pointerYState.floatValue = clampedY
+    controller.pointerY = clampedY
     val usableH = (heightPx - verticalPadPx * 2f).coerceAtLeast(1f)
     val continuousIdx = (((clampedY - verticalPadPx) / usableH) * entries.size)
       .coerceIn(0f, entries.size.toFloat())
@@ -220,11 +238,11 @@ fun AlphabetRail(
       onContinuousScrub?.invoke(continuousIdx)
     }
 
-    if (idx != lastSelectedIndex) {
-      val hadPreviousSelection = lastSelectedIndex != -1
-      lastSelectedIndex = idx
+    if (idx != controller.lastSelectedIndex) {
+      val hadPreviousSelection = controller.lastSelectedIndex != -1
+      controller.lastSelectedIndex = idx
       val selected = entries[idx]
-      scrubbedKeyState.value = selected
+      controller.scrubbedKey = selected
       if (hapticEnabled && hadPreviousSelection) {
         haptics.trigger(MistHapticEvent.WAVE_LETTER_TICK)
       }
@@ -250,8 +268,8 @@ fun AlphabetRail(
         .align(containerAlign)
         .width(touchWidth)
         .fillMaxHeight()
-        .onSizeChanged { railHeightPxState.intValue = it.height }
-        .pointerInput(entries, isLeft) {
+        .onSizeChanged { controller.railHeightPx = it.height.coerceAtLeast(1) }
+        .pointerInput(entries, isLeft, controller) {
           val touchSlopPx = viewConfiguration.touchSlop
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -259,11 +277,14 @@ fun AlphabetRail(
             val downX = down.position.x
             val downY = down.position.y
             var scrubUnlocked = false
-            lastSelectedIndex = -1
-            isDragging = true
+            controller.lastSelectedIndex = -1
+            controller.isDragging = true
             isWaveVisible = true
-            dragPullTargetState.floatValue = 0f
-            smoothedPointerYState.floatValue = downY.coerceIn(verticalPadPx, (railHeightPxState.intValue - verticalPadPx).coerceAtLeast(verticalPadPx))
+            controller.dragPullTarget = 0f
+            controller.smoothedPointerY = downY.coerceIn(
+              verticalPadPx,
+              (controller.railHeightPx - verticalPadPx).coerceAtLeast(verticalPadPx)
+            )
             onDragPullChanged(0f)
             if (hapticEnabled) {
               haptics.trigger(MistHapticEvent.WAVE_ENGAGE)
@@ -285,7 +306,7 @@ fun AlphabetRail(
                 (downX - change.position.x).coerceAtLeast(0f)
               }
               val pullRatio = (inwardDx / maxPullInputPx).coerceIn(0f, 1f)
-              dragPullTargetState.floatValue = pullRatio
+              controller.dragPullTarget = pullRatio
               onDragPullChanged(pullRatio)
 
               if (!scrubUnlocked && hypot(change.position.x - downX, change.position.y - downY) >= touchSlopPx) {
@@ -300,11 +321,11 @@ fun AlphabetRail(
               }
             }
 
-            isDragging = false
-            dragPullTargetState.floatValue = 0f
+            controller.isDragging = false
+            controller.dragPullTarget = 0f
             onDragPullChanged(0f)
-            lastSelectedIndex = -1
-            scrubbedKeyState.value = null
+            controller.lastSelectedIndex = -1
+            controller.scrubbedKey = null
             if (hapticEnabled) {
               haptics.trigger(MistHapticEvent.WAVE_RELEASE)
             }
@@ -313,13 +334,13 @@ fun AlphabetRail(
         }
     )
 
-    if (isWaveVisible) {
+    if (isWaveVisible || controller.isDragging || controller.waveStrength.value > 0.01f) {
       AlphabetWaveBubble(
-        bubbleKeyProvider = { scrubbedKeyState.value ?: activeKeyProvider() },
-        waveStrengthProvider = { waveStrength.value },
-        dragStretchProvider = { dragStretch.value },
-        pointerYProvider = { smoothedPointerYState.floatValue.takeIf { it >= 0f } ?: pointerYState.floatValue },
-        railHeightProvider = { railHeightPxState.intValue.toFloat() },
+        bubbleKeyProvider = { controller.scrubbedKey ?: activeKeyProvider() },
+        waveStrengthProvider = { controller.waveStrength.value },
+        dragStretchProvider = { controller.dragStretch.value },
+        pointerYProvider = { controller.smoothedPointerY.takeIf { it >= 0f } ?: controller.pointerY },
+        railHeightProvider = { controller.railHeightPx.toFloat() },
         dirSign = dirSign,
         bubbleHalfSizePx = bubbleHalfSizePx,
         bubbleBaseOffsetXPx = bubbleBaseOffsetXPx,
@@ -334,7 +355,7 @@ fun AlphabetRail(
         railTag = railTag,
         availableSections = availableSections,
         hasFavorites = hasFavorites,
-        invisibleMode = invisibleMode,
+        invisibleMode = invisibleMode && !controller.isDragging,
         useDarkIdleInk = isEdgeBright && !invisibleMode,
         dirSign = dirSign,
         verticalPadPx = verticalPadPx,
@@ -343,11 +364,11 @@ fun AlphabetRail(
         baseSigmaPx = baseSigmaPx,
         extraSigmaPx = extraSigmaPx,
         activeKeyProvider = activeKeyProvider,
-        isDraggingProvider = { isDragging },
-        waveStrengthProvider = { waveStrength.value },
-        dragStretchProvider = { dragStretch.value },
-        pointerYProvider = { smoothedPointerYState.floatValue.takeIf { it >= 0f } ?: pointerYState.floatValue },
-        railHeightProvider = { railHeightPxState.intValue.toFloat() },
+        isDraggingProvider = { controller.isDragging },
+        waveStrengthProvider = { controller.waveStrength.value },
+        dragStretchProvider = { controller.dragStretch.value },
+        pointerYProvider = { controller.smoothedPointerY.takeIf { it >= 0f } ?: controller.pointerY },
+        railHeightProvider = { controller.railHeightPx.toFloat() },
         modifier = Modifier
           .align(containerAlign)
           .width(34.dp)
@@ -356,6 +377,123 @@ fun AlphabetRail(
       )
     }
   }
+}
+
+/**
+ * Lightweight single-Box left-edge touch sensor (`1` node instead of `28+`).
+ * Sliding on the left edge drives the exact same shared [AlphabetRailController]
+ * as the right edge so both sides share one alphabetic drawer list with zero duplicate UI cost.
+ */
+@Composable
+fun LeftAlphabetEdgeSensor(
+  controller: AlphabetRailController,
+  hapticEnabled: Boolean,
+  onSelectKey: (String) -> Unit,
+  modifier: Modifier = Modifier,
+  onDraggingChanged: (Boolean) -> Unit = {},
+  onDragPullChanged: (Float) -> Unit = {},
+  onContinuousScrub: ((Float) -> Unit)? = null,
+  onDragEnd: () -> Unit = {}
+) {
+  val entries = controller.entries
+  val haptics = LocalMistHaptics.current
+  val density = LocalDensity.current
+  val verticalPadPx = with(density) { 4.dp.toPx() }
+  val maxPullInputPx = with(density) { 80.dp.toPx() }
+
+  fun dispatchMappedY(sensorY: Float, emitSelect: Boolean, emitContinuous: Boolean) {
+    val sensorH = controller.sensorHeightPx.coerceAtLeast(1)
+    val railH = controller.railHeightPx.coerceAtLeast(1)
+    val fraction = ((sensorY - verticalPadPx) / (sensorH - verticalPadPx * 2f).coerceAtLeast(1f))
+      .coerceIn(0f, 1f)
+    val mappedY = verticalPadPx + fraction * (railH - verticalPadPx * 2f).coerceAtLeast(1f)
+    controller.pointerY = mappedY
+
+    val continuousIdx = (fraction * entries.size).coerceIn(0f, entries.size.toFloat())
+    val idx = continuousIdx.toInt().coerceIn(0, entries.lastIndex)
+
+    if (emitContinuous) {
+      onContinuousScrub?.invoke(continuousIdx)
+    }
+
+    if (idx != controller.lastSelectedIndex) {
+      val hadPreviousSelection = controller.lastSelectedIndex != -1
+      controller.lastSelectedIndex = idx
+      val selected = entries[idx]
+      controller.scrubbedKey = selected
+      if (hapticEnabled && hadPreviousSelection) {
+        haptics.trigger(MistHapticEvent.WAVE_LETTER_TICK)
+      }
+      if (emitSelect) {
+        onSelectKey(selected)
+      }
+    }
+  }
+
+  Box(
+    modifier = modifier
+      .testTag("left_alphabet_rail")
+      .width(28.dp)
+      .fillMaxHeight()
+      .onSizeChanged { controller.sensorHeightPx = it.height.coerceAtLeast(1) }
+      .pointerInput(entries, controller) {
+        val touchSlopPx = viewConfiguration.touchSlop
+        awaitEachGesture {
+          val down = awaitFirstDown(requireUnconsumed = false)
+          down.consume()
+          val downX = down.position.x
+          val downY = down.position.y
+          var scrubUnlocked = false
+          controller.lastSelectedIndex = -1
+          controller.isDragging = true
+          onDraggingChanged(true)
+          controller.dragPullTarget = 0f
+          onDragPullChanged(0f)
+          if (hapticEnabled) {
+            haptics.trigger(MistHapticEvent.WAVE_ENGAGE)
+          }
+          dispatchMappedY(downY, emitSelect = true, emitContinuous = false)
+          controller.smoothedPointerY = controller.pointerY
+
+          while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
+            if (change == null || !change.pressed) {
+              change?.consume()
+              break
+            }
+            change.consume()
+
+            val inwardDx = (change.position.x - downX).coerceAtLeast(0f)
+            val pullRatio = (inwardDx / maxPullInputPx).coerceIn(0f, 1f)
+            controller.dragPullTarget = pullRatio
+            onDragPullChanged(pullRatio)
+
+            if (!scrubUnlocked && hypot(change.position.x - downX, change.position.y - downY) >= touchSlopPx) {
+              scrubUnlocked = true
+            }
+            if (scrubUnlocked) {
+              dispatchMappedY(
+                sensorY = change.position.y,
+                emitSelect = onContinuousScrub == null,
+                emitContinuous = onContinuousScrub != null
+              )
+            }
+          }
+
+          controller.isDragging = false
+          onDraggingChanged(false)
+          controller.dragPullTarget = 0f
+          onDragPullChanged(0f)
+          controller.lastSelectedIndex = -1
+          controller.scrubbedKey = null
+          if (hapticEnabled) {
+            haptics.trigger(MistHapticEvent.WAVE_RELEASE)
+          }
+          onDragEnd()
+        }
+      }
+  )
 }
 
 @Composable
