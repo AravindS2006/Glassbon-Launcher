@@ -18,10 +18,13 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.example.ui.drawer.DrawerFocusAlphaKey
 import com.example.ui.drawer.DrawerFocusBlurRadiusKey
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -32,8 +35,20 @@ import kotlin.math.abs
 @Config(sdk = [36], qualifiers = "w411dp-h915dp-xxhdpi")
 class DrawerAlphabetJumpRobolectricTest {
 
+  private val composeTestRule = createEmptyComposeRule()
+
+  private val resetPreferencesRule = object : ExternalResource() {
+    override fun before() {
+      runBlocking {
+        com.example.data.preferences.PreferencesRepository(
+          ApplicationProvider.getApplicationContext()
+        ).resetAllForTest()
+      }
+    }
+  }
+
   @get:Rule
-  val composeTestRule = createEmptyComposeRule()
+  val ruleChain: RuleChain = RuleChain.outerRule(resetPreferencesRule).around(composeTestRule)
 
   private fun assertSectionCenteredAndFullyVisible(
     headerTag: String,
@@ -123,16 +138,24 @@ class DrawerAlphabetJumpRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     registerSyntheticApps(context)
 
-    ActivityScenario.launch(MainActivity::class.java).use {
+    ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+      var mainActivity: MainActivity? = null
+      scenario.onActivity { mainActivity = it }
+      val viewModel = androidx.lifecycle.ViewModelProvider(requireNotNull(mainActivity))[com.example.ui.LauncherViewModel::class.java]
+
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-        composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
-          .fetchSemanticsNodes().isNotEmpty()
+        Thread.sleep(20)
+        !viewModel.uiState.value.isLoading &&
+          viewModel.uiState.value.sectionIndexMap.containsKey("G") &&
+          composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
+            .fetchSemanticsNodes().isNotEmpty()
       }
 
       // Click the exact rendered letter 'G' on Home's right alphabet rail
       composeTestRule.onNodeWithTag("alphabet_rail_key_G", useUnmergedTree = true).performClick()
 
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
         composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.glassnotes", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -257,8 +280,11 @@ class DrawerAlphabetJumpRobolectricTest {
       val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
 
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-        composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
-          .fetchSemanticsNodes().isNotEmpty()
+        Thread.sleep(20)
+        !viewModel.uiState.value.isLoading &&
+          viewModel.uiState.value.sectionIndexMap.containsKey("G") &&
+          composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
+            .fetchSemanticsNodes().isNotEmpty()
       }
 
       // Switch to Low Power mode via Quick Actions -> Preferences -> Low Power
@@ -272,6 +298,7 @@ class DrawerAlphabetJumpRobolectricTest {
       composeTestRule.waitForIdle()
       composeTestRule.onNodeWithTag("perf_mode_power_saver").assertIsDisplayed().performClick()
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
         composeTestRule.onAllNodesWithText("Low Power active", substring = true)
           .fetchSemanticsNodes().isNotEmpty()
       }
@@ -293,6 +320,7 @@ class DrawerAlphabetJumpRobolectricTest {
       )
       composeTestRule.onNodeWithTag("settings_back_button").performClick()
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
         composeTestRule.onAllNodesWithTag("settings_screen").fetchSemanticsNodes().isEmpty() &&
           composeTestRule.onAllNodesWithTag("alphabet_rail_key_G", useUnmergedTree = true)
             .fetchSemanticsNodes().isNotEmpty()
@@ -302,6 +330,7 @@ class DrawerAlphabetJumpRobolectricTest {
       // Jump to G -> centered cleanly, but zero blur FBOs allocated on neighbor rows
       composeTestRule.onNodeWithTag("alphabet_rail_key_G", useUnmergedTree = true).performClick()
       composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
         composeTestRule.onAllNodesWithTag("drawer_app_row_com.test.glassnotes", useUnmergedTree = true)
           .fetchSemanticsNodes().isNotEmpty()
       }

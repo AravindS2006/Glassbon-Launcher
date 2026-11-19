@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -117,12 +118,18 @@ fun AlphabetRail(
   val entries = controller.entries
   val haptics = LocalMistHaptics.current
   val density = LocalDensity.current
+  val currentHapticEnabled by rememberUpdatedState(hapticEnabled)
+  val currentOnSelectKey by rememberUpdatedState(onSelectKey)
+  val currentOnDraggingChanged by rememberUpdatedState(onDraggingChanged)
+  val currentOnDragPullChanged by rememberUpdatedState(onDragPullChanged)
+  val currentOnContinuousScrub by rememberUpdatedState(onContinuousScrub)
+  val currentOnDragEnd by rememberUpdatedState(onDragEnd)
 
   var isWaveVisible by remember(invisibleMode) { mutableStateOf(!invisibleMode) }
 
   LaunchedEffect(controller.isDragging, reducedMotion, invisibleMode) {
     val dragging = controller.isDragging
-    onDraggingChanged(dragging)
+    currentOnDraggingChanged(dragging)
     if (dragging) {
       isWaveVisible = true
       if (reducedMotion) {
@@ -235,7 +242,7 @@ fun AlphabetRail(
     val idx = continuousIdx.toInt().coerceIn(0, entries.lastIndex)
 
     if (emitContinuous) {
-      onContinuousScrub?.invoke(continuousIdx)
+      currentOnContinuousScrub?.invoke(continuousIdx)
     }
 
     if (idx != controller.lastSelectedIndex) {
@@ -243,11 +250,11 @@ fun AlphabetRail(
       controller.lastSelectedIndex = idx
       val selected = entries[idx]
       controller.scrubbedKey = selected
-      if (hapticEnabled && hadPreviousSelection) {
+      if (currentHapticEnabled && hadPreviousSelection) {
         haptics.trigger(MistHapticEvent.WAVE_LETTER_TICK)
       }
       if (emitSelect) {
-        onSelectKey(selected)
+        currentOnSelectKey(selected)
       }
     }
   }
@@ -285,8 +292,8 @@ fun AlphabetRail(
               verticalPadPx,
               (controller.railHeightPx - verticalPadPx).coerceAtLeast(verticalPadPx)
             )
-            onDragPullChanged(0f)
-            if (hapticEnabled) {
+            currentOnDragPullChanged(0f)
+            if (currentHapticEnabled) {
               haptics.trigger(MistHapticEvent.WAVE_ENGAGE)
             }
             dispatchContinuousForY(downY, emitSelect = true, emitContinuous = false)
@@ -307,29 +314,30 @@ fun AlphabetRail(
               }
               val pullRatio = (inwardDx / maxPullInputPx).coerceIn(0f, 1f)
               controller.dragPullTarget = pullRatio
-              onDragPullChanged(pullRatio)
+              currentOnDragPullChanged(pullRatio)
 
               if (!scrubUnlocked && hypot(change.position.x - downX, change.position.y - downY) >= touchSlopPx) {
                 scrubUnlocked = true
               }
               if (scrubUnlocked) {
+                val hasContinuous = currentOnContinuousScrub != null
                 dispatchContinuousForY(
                   y = change.position.y,
-                  emitSelect = onContinuousScrub == null,
-                  emitContinuous = onContinuousScrub != null
+                  emitSelect = !hasContinuous,
+                  emitContinuous = hasContinuous
                 )
               }
             }
 
             controller.isDragging = false
             controller.dragPullTarget = 0f
-            onDragPullChanged(0f)
+            currentOnDragPullChanged(0f)
             controller.lastSelectedIndex = -1
             controller.scrubbedKey = null
-            if (hapticEnabled) {
+            if (currentHapticEnabled) {
               haptics.trigger(MistHapticEvent.WAVE_RELEASE)
             }
-            onDragEnd()
+            currentOnDragEnd()
           }
         }
     )
@@ -398,6 +406,12 @@ fun LeftAlphabetEdgeSensor(
   val entries = controller.entries
   val haptics = LocalMistHaptics.current
   val density = LocalDensity.current
+  val currentHapticEnabled by rememberUpdatedState(hapticEnabled)
+  val currentOnSelectKey by rememberUpdatedState(onSelectKey)
+  val currentOnDraggingChanged by rememberUpdatedState(onDraggingChanged)
+  val currentOnDragPullChanged by rememberUpdatedState(onDragPullChanged)
+  val currentOnContinuousScrub by rememberUpdatedState(onContinuousScrub)
+  val currentOnDragEnd by rememberUpdatedState(onDragEnd)
   val verticalPadPx = with(density) { 4.dp.toPx() }
   val maxPullInputPx = with(density) { 80.dp.toPx() }
 
@@ -413,7 +427,7 @@ fun LeftAlphabetEdgeSensor(
     val idx = continuousIdx.toInt().coerceIn(0, entries.lastIndex)
 
     if (emitContinuous) {
-      onContinuousScrub?.invoke(continuousIdx)
+      currentOnContinuousScrub?.invoke(continuousIdx)
     }
 
     if (idx != controller.lastSelectedIndex) {
@@ -421,11 +435,11 @@ fun LeftAlphabetEdgeSensor(
       controller.lastSelectedIndex = idx
       val selected = entries[idx]
       controller.scrubbedKey = selected
-      if (hapticEnabled && hadPreviousSelection) {
+      if (currentHapticEnabled && hadPreviousSelection) {
         haptics.trigger(MistHapticEvent.WAVE_LETTER_TICK)
       }
       if (emitSelect) {
-        onSelectKey(selected)
+        currentOnSelectKey(selected)
       }
     }
   }
@@ -446,10 +460,10 @@ fun LeftAlphabetEdgeSensor(
           var scrubUnlocked = false
           controller.lastSelectedIndex = -1
           controller.isDragging = true
-          onDraggingChanged(true)
+          currentOnDraggingChanged(true)
           controller.dragPullTarget = 0f
-          onDragPullChanged(0f)
-          if (hapticEnabled) {
+          currentOnDragPullChanged(0f)
+          if (currentHapticEnabled) {
             haptics.trigger(MistHapticEvent.WAVE_ENGAGE)
           }
           dispatchMappedY(downY, emitSelect = true, emitContinuous = false)
@@ -467,30 +481,31 @@ fun LeftAlphabetEdgeSensor(
             val inwardDx = (change.position.x - downX).coerceAtLeast(0f)
             val pullRatio = (inwardDx / maxPullInputPx).coerceIn(0f, 1f)
             controller.dragPullTarget = pullRatio
-            onDragPullChanged(pullRatio)
+            currentOnDragPullChanged(pullRatio)
 
             if (!scrubUnlocked && hypot(change.position.x - downX, change.position.y - downY) >= touchSlopPx) {
               scrubUnlocked = true
             }
             if (scrubUnlocked) {
+              val hasContinuous = currentOnContinuousScrub != null
               dispatchMappedY(
                 sensorY = change.position.y,
-                emitSelect = onContinuousScrub == null,
-                emitContinuous = onContinuousScrub != null
+                emitSelect = !hasContinuous,
+                emitContinuous = hasContinuous
               )
             }
           }
 
           controller.isDragging = false
-          onDraggingChanged(false)
+          currentOnDraggingChanged(false)
           controller.dragPullTarget = 0f
-          onDragPullChanged(0f)
+          currentOnDragPullChanged(0f)
           controller.lastSelectedIndex = -1
           controller.scrubbedKey = null
-          if (hapticEnabled) {
+          if (currentHapticEnabled) {
             haptics.trigger(MistHapticEvent.WAVE_RELEASE)
           }
-          onDragEnd()
+          currentOnDragEnd()
         }
       }
   )

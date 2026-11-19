@@ -259,12 +259,14 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").assertIsDisplayed()
     composeTestRule.onNodeWithTag("perf_mode_power_saver").assertIsDisplayed().performClick()
     composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(20)
       composeTestRule.onAllNodesWithText("Low Power active", substring = true)
         .fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithText("Low Power active", substring = true).assertIsDisplayed()
     composeTestRule.onNodeWithTag("perf_mode_ultra_smooth").performClick()
     composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(20)
       composeTestRule.onAllNodesWithText("Ultra-Smooth active", substring = true)
         .fetchSemanticsNodes().isNotEmpty()
     }
@@ -364,6 +366,7 @@ class LauncherUiRobolectricTest {
 
     // Subtle Hold ⏻ for Quick Actions hint appears cleanly above the Power icon
     composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(20)
       composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag("power_hold_hint_pill").assertIsDisplayed()

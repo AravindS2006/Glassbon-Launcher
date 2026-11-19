@@ -263,7 +263,7 @@ fun LauncherRoot(
         activeHomeScrubSide = activeHomeScrubSide,
         onScrubToDrawerSection = { key, side ->
           activeHomeScrubSide = side
-          if (uiState.isDrawerOpen) {
+          if (viewModel.uiState.value.isDrawerOpen) {
             viewModel.emitDrawerJump(key)
           } else {
             viewModel.openDrawer(withSearch = false, jumpToSection = key)
