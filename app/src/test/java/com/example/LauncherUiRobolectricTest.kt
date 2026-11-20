@@ -358,16 +358,42 @@ class LauncherUiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("walkthrough_skip_button").performClick()
     composeTestRule.waitForIdle()
-    // Dismiss onboarding card if still visible (e.g. when device has another default Home app)
+    // Skipping persists walkthroughCompleted asynchronously (DataStore on IO); wait for it and for the
+    // walkthrough overlay to finish fading out so it can't swallow the next tap or keep the onboarding card up.
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+      Thread.sleep(20)
+      viewModel.uiState.value.preferences.walkthroughCompleted &&
+        composeTestRule.onAllNodesWithTag("walkthrough_overlay").fetchSemanticsNodes().isEmpty()
+    }
+    composeTestRule.waitForIdle()
+    // Dismiss onboarding card if still visible (e.g. when device has another default Home app) and wait until
+    // the dismissal is persisted, since the hint pill only appears once the onboarding card is gone.
     if (composeTestRule.onAllNodesWithTag("onboarding_dismiss_button").fetchSemanticsNodes().isNotEmpty()) {
       composeTestRule.onNodeWithTag("onboarding_dismiss_button").performClick()
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
+        viewModel.uiState.value.preferences.onboardingDismissed
+      }
       composeTestRule.waitForIdle()
     }
 
     // Subtle Hold ⏻ for Quick Actions hint appears cleanly above the Power icon
-    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      Thread.sleep(20)
-      composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
+    try {
+      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+        Thread.sleep(20)
+        composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
+      }
+    } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+      // Surface the exact gating state so any future flake is diagnosable from CI logs alone
+      val s = viewModel.uiState.value
+      val p = s.preferences
+      throw AssertionError(
+        "power_hold_hint_pill never appeared: isDefaultLauncher=${s.isDefaultLauncher}, " +
+          "onboardingDismissed=${p.onboardingDismissed}, walkthroughCompleted=${p.walkthroughCompleted}, " +
+          "quickActionsDiscovered=${p.quickActionsDiscovered}, quickActionMode=${p.quickActionMode}, " +
+          "isDrawerOpen=${s.isDrawerOpen}, activeOverlay=${s.activeOverlay}, showWalkthrough=${s.showWalkthrough}",
+        e
+      )
     }
     composeTestRule.onNodeWithTag("power_hold_hint_pill").assertIsDisplayed()
     composeTestRule.onNodeWithText("Hold ⏻ for Quick Actions").assertIsDisplayed()
