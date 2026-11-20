@@ -335,6 +335,18 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("walkthrough_overlay").assertDoesNotExist()
   }
 
+  /**
+   * Robolectric runs tests on the main looper thread, so state that arrives from a background DataStore write
+   * is only delivered when the looper is pumped. Idle it explicitly on every poll instead of relying on timing.
+   */
+  private fun waitUntilMainIdle(timeoutMillis: Long = 10_000L, condition: () -> Boolean) {
+    composeTestRule.waitUntil(timeoutMillis) {
+      Thread.sleep(20)
+      shadowOf(android.os.Looper.getMainLooper()).idle()
+      condition()
+    }
+  }
+
   @Test
   fun `skipping tour surfaces hold for preferences hint pill when power icon is active and dismisses on open`() {
     val activity = composeTestRule.activity
@@ -345,8 +357,7 @@ class LauncherUiRobolectricTest {
     })
     composeTestRule.waitForIdle()
     val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.LauncherViewModel::class.java]
-    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      Thread.sleep(25)
+    waitUntilMainIdle {
       composeTestRule.onAllNodesWithContentDescription("Lock screen or hold for quick actions")
         .fetchSemanticsNodes().isNotEmpty() &&
         viewModel.uiState.value.linkedLockApp?.packageName == lockPkg
@@ -360,8 +371,7 @@ class LauncherUiRobolectricTest {
     composeTestRule.waitForIdle()
     // Skipping persists walkthroughCompleted asynchronously (DataStore on IO); wait for it and for the
     // walkthrough overlay to finish fading out so it can't swallow the next tap or keep the onboarding card up.
-    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      Thread.sleep(20)
+    waitUntilMainIdle {
       viewModel.uiState.value.preferences.walkthroughCompleted &&
         composeTestRule.onAllNodesWithTag("walkthrough_overlay").fetchSemanticsNodes().isEmpty()
     }
@@ -370,8 +380,7 @@ class LauncherUiRobolectricTest {
     // the dismissal is persisted, since the hint pill only appears once the onboarding card is gone.
     if (composeTestRule.onAllNodesWithTag("onboarding_dismiss_button").fetchSemanticsNodes().isNotEmpty()) {
       composeTestRule.onNodeWithTag("onboarding_dismiss_button").performClick()
-      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-        Thread.sleep(20)
+      waitUntilMainIdle {
         viewModel.uiState.value.preferences.onboardingDismissed
       }
       composeTestRule.waitForIdle()
@@ -379,8 +388,7 @@ class LauncherUiRobolectricTest {
 
     // Subtle Hold ⏻ for Quick Actions hint appears cleanly above the Power icon
     try {
-      composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-        Thread.sleep(20)
+      waitUntilMainIdle {
         composeTestRule.onAllNodesWithTag("power_hold_hint_pill").fetchSemanticsNodes().isNotEmpty()
       }
     } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
@@ -402,8 +410,7 @@ class LauncherUiRobolectricTest {
     composeTestRule.onNodeWithTag("power_hold_hint_action").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("quick_actions_overlay").assertIsDisplayed()
-    composeTestRule.waitUntil(timeoutMillis = 10_000L) {
-      Thread.sleep(25)
+    waitUntilMainIdle {
       viewModel.uiState.value.preferences.quickActionsDiscovered
     }
     composeTestRule.runOnUiThread {
