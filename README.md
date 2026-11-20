@@ -43,16 +43,22 @@
   - Edge-to-edge grayscale misty alpine forest wallpaper (or any personal photo via Android's zero-permission **Photo Picker**) with off-thread `RGB_565` bitmap caching.
   - **Adaptive Multi-Zone Luminance Contrast**: Samples top, middle, and side-edge wallpaper luminance once off-thread (`12×12` grid) to adjust status bar icons, clock/date ink, right-edge contrast scrims, and favorite icon backing automatically.
   - **Unified Clock & Frosted Calendar Pill**: Styled in **Plus Jakarta Sans** or **Instrument Serif**; tap time to open Alarms/Clock or tap the frosted date pill to launch Calendar.
+  - **Smart Dynamic Media Capsule**: Appears beneath Clock/Date only while audio is playing (or briefly after you pause) and follows playback started or stopped in any app, headphones, or the notification shade — driven by Android's permission-free `AudioPlaybackCallback` (Android 8+), registered only while the launcher is visible.
 - **Single Shared Dual-Edge Curved Alphabet Wave**
   - Only **one** 28-letter curved Gaussian A–Z rail is composed—touching or sliding along either the visible **Right A–Z Rail** *or* the lightweight 1-node **Hidden Left Edge** sensor drives the exact same alphabetic drawer list (`28.dp` outer gutter protects favorites from accidental taps).
   - Only alphabet edges open the App Library (and swiping down in the drawer returns smoothly to Home)—direct vertical swipes on Home remain calm and deliberate.
+- **Ranked, Typo-Tolerant App Search**
+  - Results are ordered by relevance: exact name → name prefix → word prefix (`mus` → *YouTube Music*) → initials (`gm` → *Google Maps*) → substring → package name; pressing **Enter** launches the top match.
+  - Accent-insensitive (`cafe` finds *Café*) and multi-word aware (`goo ma` finds *Google Maps*); reverse-domain package prefixes (`com.`, `org.`) are ignored so short queries stay precise.
 - **Compact Frosted Squircles & Pop-Up App Preview**
   - Defaults to `COMPACT` frosted monochrome squircles (`42.dp` Home / `32.dp` Drawer) with specular rim highlights, package-resource-safe icon cloning, and multi-source fallback rendering so installed apps never lose their icon.
   - **Long-press any app** to launch the finite-spring **Frosted Pop-Up App Preview** card with an inline status pill (`Home #N`, `Hidden`, or `App`), reordering, hiding, App Info, and uninstall controls.
+  - **Hidden apps stay hidden**: hiding an app also removes it from the Home dock and the drawer's Favorites section (its favorite slot is restored when you unhide it).
   - **Smooth Drawer Alphabet Centering & Focus Blur (`Off` / `Soft` / `Frosted` / `Deep`)**: Selecting or sliding an alphabet glides smoothly at 60–120 FPS to center its apps vertically with GPU-only depth lift/recede while settling a single drawer-cached bounded `BlurEffect` on neighboring sections with zero scroll jank.
 - **Adaptive Lock Screen & Quick Actions Control, Home Switcher & Zero Manifest Permissions**
   - **Auto-Detection & Adaptive Fallback**: During startup, foreground resume, and package install/uninstall events, Glassbon automatically detects installed OEM or Play Store Android Lock Screen utilities (`LockScreenAppHelper`). When linked, the bottom-right button shows a **Power (`⏻`)** icon that launches your Lock app; if no Lock app is installed on the device, it seamlessly transforms into a **Settings (`⚙`)** icon so tapping opens **Glassbon Preferences** directly. **Press & hold** the button anytime to open **Quick Actions**.
   - **Tour-Skip Friendly Discovery**: Users who skip the guided tour still see a self-dismissing frosted `"Hold ⏻ for Quick Actions"` callout above the bottom-right button until Quick Actions is opened.
+  - **Natural Preferences Navigation**: Wallpaper Studio, Favorites Manager, and Hidden Apps opened from **Preferences** return to Preferences on Back; opened from **Quick Actions**, they return straight to Home.
   - **Default Home Switcher**: Once Glassbon is set as your default Home app, both **Quick Actions → Change Home App** and **Preferences → Change Default Home App** open Android's Home selector so you can switch back to any other launcher anytime.
   - **Performance Modes (`Ultra-Smooth` vs. `Low Power`)**: Switch between full prewarmed icons, 120Hz springs & frosted drawer blur, or **Low Power** mode which halves bitmap decode cost, skips icon prewarming, shrinks cache allocations, snaps transitions, and disables blur shaders for near-zero battery & CPU impact.
   - **Sculpted Tactile Haptics (`MistHaptics`)**: Zero-permission `HapticFeedbackConstants` cues with **Subtle**, **Balanced**, and **Crisp** profiles across curved wave detents, drawer swipe-down return, context pop-ups, and app launches.
@@ -73,6 +79,7 @@
 | **Left Edge Sensor** | Lightweight 1-node `28.dp` touch strip driving the single shared right A–Z rail controller | Zero duplicate 28-letter composition cost |
 | **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; snapped in **Low Power** / **Reduced Motion** |
 | **Clock & Guided Tour** | Event-driven `ACTION_TIME_TICK`; `WalkthroughOverlay` is only composed while explicitly open | Zero background loops, listeners, or idle overhead |
+| **Media Capsule** | Event-driven `AudioManager.AudioPlaybackCallback` registered in `onStart` and removed in `onStop`, with coalesced refreshes | No polling; zero work while the launcher is in the background |
 
 ---
 
@@ -91,6 +98,8 @@ Replay the tour anytime via **Quick Actions → Guided Feature Tour** or **Prefe
 ---
 
 ## Building & Testing Locally
+
+**Prerequisites:** JDK 17+, the Android SDK (API 36, set `ANDROID_HOME` or `sdk.dir` in `local.properties`), and **Gradle 9.3.1** on your `PATH` — the repository does not ship a `gradlew` wrapper script, matching the CI workflow.
 
 ```bash
 # Build Debug APK
