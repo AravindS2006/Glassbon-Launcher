@@ -105,16 +105,6 @@ object SystemActionsHelper {
     return tryStartActivity(context, viewIntent)
   }
 
-  fun openMusicApp(context: Context): Boolean {
-    val musicIntent = Intent.makeMainSelectorActivity(
-      Intent.ACTION_MAIN,
-      Intent.CATEGORY_APP_MUSIC
-    ).apply {
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    return tryStartActivity(context, musicIntent)
-  }
-
   private fun tryStartActivity(context: Context, intent: Intent): Boolean {
     return try {
       context.startActivity(intent)

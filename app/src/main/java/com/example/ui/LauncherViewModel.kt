@@ -1,7 +1,12 @@
 package com.example.ui
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
@@ -11,8 +16,6 @@ import com.example.data.apps.AppIndexHelper
 import com.example.data.apps.AppInfo
 import com.example.data.apps.AppRepository
 import com.example.data.apps.AppSection
-import com.example.data.media.ActiveMediaState
-import com.example.data.media.MediaRepository
 import com.example.data.preferences.AlphabetFocusBlur
 import com.example.data.preferences.HapticProfile
 import com.example.data.preferences.HomeAlphabetVisibility
@@ -28,6 +31,7 @@ import com.example.data.wallpaper.WallpaperProcessor
 import com.example.platform.DefaultLauncherHelper
 import com.example.platform.LockScreenAppHelper
 import com.example.platform.SystemActionsHelper
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -105,7 +109,6 @@ data class LauncherUiState(
   val isDefaultLauncher: Boolean = false,
   val linkedLockApp: AppInfo? = null,
   val suggestedLockApps: List<AppInfo> = emptyList(),
-  val activeMedia: ActiveMediaState = ActiveMediaState(),
   val preferences: LauncherPreferences = LauncherPreferences(),
   val wallpaper: ProcessedWallpaper = ProcessedWallpaper(null, null, isTopBright = true),
   val statusMessage: String? = null
@@ -151,7 +154,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   private val appRepository = AppRepository(appContext) { pkg ->
     iconCache.invalidatePackage(pkg)
   }
-  private val mediaRepository = MediaRepository(appContext)
   private val preferencesRepository = PreferencesRepository(appContext)
   private val wallpaperProcessor = WallpaperProcessor(appContext)
 
@@ -164,6 +166,23 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     ProcessedWallpaper(homeBitmap = null, drawerBlurredBitmap = null, isTopBright = true)
   )
   private val userManuallyUnlinkedLockApp = MutableStateFlow(false)
+
+  private val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
+  private val systemBatterySaver = MutableStateFlow(readSystemBatterySaver())
+  private var batterySaverReceiverRegistered = false
+  private val batterySaverReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+      systemBatterySaver.value = readSystemBatterySaver()
+    }
+  }
+
+  /** Persisted preferences plus the live system Battery Saver flag, so every effect gate sees one source of truth. */
+  private val effectivePreferences = combine(
+    preferencesRepository.preferences,
+    systemBatterySaver
+  ) { prefs, saver ->
+    if (prefs.systemBatterySaver == saver) prefs else prefs.copy(systemBatterySaver = saver)
+  }.distinctUntilChanged()
   private var knownInstalledComponentKeys: Set<String> = emptySet()
 
   private val _drawerJumpEvents = MutableSharedFlow<String>(
@@ -182,7 +201,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   private val derivedAppsFlow = combine(
     appRepository.apps,
     appRepository.isLoading,
-    preferencesRepository.preferences,
+    effectivePreferences,
     userManuallyUnlinkedLockApp
   ) { allApps, loading, prefs, manuallyUnlinked ->
     val appByKey = allApps.associateBy { it.componentKey }
@@ -254,9 +273,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   val uiState: StateFlow<LauncherUiState> = combine(
     derivedAppsFlow,
     wallpaperState,
-    transientState,
-    mediaRepository.mediaState
-  ) { derived, wallpaper, transient, media ->
+    transientState
+  ) { derived, wallpaper, transient ->
     val searchResults = if (transient.isSearchActive) {
       AppIndexHelper.filterApps(derived.visibleApps, transient.searchQuery)
     } else {
@@ -287,7 +305,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       isDefaultLauncher = transient.isDefaultLauncher,
       linkedLockApp = derived.linkedLockApp,
       suggestedLockApps = derived.suggestedLockApps,
-      activeMedia = media,
       preferences = derived.prefs,
       wallpaper = wallpaper,
       statusMessage = transient.statusMessage
@@ -313,7 +330,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     viewModelScope.launch {
-      preferencesRepository.preferences
+      effectivePreferences
         .map { prefs ->
           WallpaperKey(
             path = prefs.customWallpaperPath,
@@ -383,7 +400,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     viewModelScope.launch {
       combine(
         appRepository.apps,
-        preferencesRepository.preferences
+        effectivePreferences
           .map { it.iconStyle to it.isPowerSaver }
           .distinctUntilChanged()
       ) { apps, (style, powerSaver) -> Triple(apps, style, powerSaver) }
@@ -438,13 +455,42 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun onAppStart() {
-    mediaRepository.startObserving()
-    appRepository.refreshIfNeeded()
+    registerBatterySaverReceiver()
+    // Package/locale receivers stay registered for the ViewModel's lifetime, so returning Home doesn't need a
+    // full PackageManager re-query each time; this is only a slow safety net for events missed while frozen.
+    appRepository.refreshIfNeeded(minIntervalMs = APP_LIST_SAFETY_REFRESH_MS)
     refreshSystemStatus()
   }
 
   fun onAppStop() {
-    mediaRepository.stopObserving()
+    unregisterBatterySaverReceiver()
+  }
+
+  fun onTrimMemory(level: Int) {
+    if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+      iconCache.trimForMemoryPressure()
+    }
+  }
+
+  private fun readSystemBatterySaver(): Boolean =
+    runCatching { powerManager?.isPowerSaveMode == true }.getOrDefault(false)
+
+  private fun registerBatterySaverReceiver() {
+    systemBatterySaver.value = readSystemBatterySaver()
+    if (batterySaverReceiverRegistered) return
+    batterySaverReceiverRegistered = true
+    ContextCompat.registerReceiver(
+      appContext,
+      batterySaverReceiver,
+      IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+      ContextCompat.RECEIVER_NOT_EXPORTED
+    )
+  }
+
+  private fun unregisterBatterySaverReceiver() {
+    if (!batterySaverReceiverRegistered) return
+    batterySaverReceiverRegistered = false
+    runCatching { appContext.unregisterReceiver(batterySaverReceiver) }
   }
 
   fun refreshSystemStatus() {
@@ -656,14 +702,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
       transientState.update { it.copy(statusMessage = "No Calendar app found.") }
     }
   }
-
-  fun toggleMediaPlayPause() = mediaRepository.togglePlayPause()
-
-  fun skipMediaNext() = mediaRepository.skipToNext()
-
-  fun skipMediaPrevious() = mediaRepository.skipToPrevious()
-
-  fun openActiveMediaPlayer() = mediaRepository.openActivePlayer()
 
   fun toggleQuickActions(show: Boolean) {
     transientState.update {
@@ -906,6 +944,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     viewModelScope.launch { preferencesRepository.setQuickActionMode(mode) }
   }
 
+  private companion object {
+    const val APP_LIST_SAFETY_REFRESH_MS = 5 * 60_000L
+  }
+
   fun dismissOnboarding() {
     viewModelScope.launch { preferencesRepository.setOnboardingDismissed(true) }
   }
@@ -913,7 +955,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   override fun onCleared() {
     super.onCleared()
     appRepository.stopObserving()
-    mediaRepository.stopObserving()
+    unregisterBatterySaverReceiver()
     iconCache.clear()
   }
 }

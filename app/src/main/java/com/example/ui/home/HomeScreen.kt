@@ -1,12 +1,5 @@
 package com.example.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,7 +76,6 @@ import com.example.ui.components.ClockView
 import com.example.ui.components.FloatingCircleButton
 import com.example.ui.components.GlassSurface
 import com.example.ui.components.LeftAlphabetEdgeSensor
-import com.example.ui.components.LiquidMediaCard
 import com.example.ui.components.MistAppIcon
 import com.example.ui.components.rememberAlphabetRailController
 import com.example.ui.theme.FunctionalSansFontFamily
@@ -108,10 +100,6 @@ fun HomeScreen(
   onPowerButtonLongPress: () -> Unit,
   onClockClick: () -> Unit,
   onDateClick: () -> Unit,
-  onToggleMediaPlayPause: () -> Unit,
-  onSkipMediaNext: () -> Unit,
-  onSkipMediaPrevious: () -> Unit,
-  onOpenActiveMediaPlayer: () -> Unit,
   onRequestDefaultHome: () -> Unit,
   onStartTour: () -> Unit,
   onDismissOnboarding: () -> Unit,
@@ -134,7 +122,6 @@ fun HomeScreen(
       .windowInsetsPadding(WindowInsets.navigationBars)
       .padding(vertical = 18.dp)
   ) {
-    val hasActiveMedia = uiState.activeMedia.hasSession
     val useSans = prefs.typographyStyle == TypographyStyle.CLEAN_SANS
 
     // Zero-cost static adaptive edge scrim only when wallpaper edges are bright
@@ -167,7 +154,7 @@ fun HomeScreen(
           translationY = -p * 40f
         }
     ) {
-      Spacer(modifier = Modifier.height(if (hasActiveMedia) 8.dp else 20.dp))
+      Spacer(modifier = Modifier.height(20.dp))
 
       ClockView(
         snapshot = clockSnapshot,
@@ -175,30 +162,11 @@ fun HomeScreen(
         showDate = prefs.showDate,
         isTopBright = uiState.wallpaper.isTopBright,
         typographyStyle = prefs.typographyStyle,
-        isMediaActive = hasActiveMedia,
         onClockClick = onClockClick,
         onDateClick = onDateClick
       )
 
-      AnimatedVisibility(
-        visible = hasActiveMedia,
-        enter = if (prefs.effectiveReducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-        exit = if (prefs.effectiveReducedMotion) ExitTransition.None else fadeOut() + shrinkVertically()
-      ) {
-        Column {
-          Spacer(modifier = Modifier.height(14.dp))
-          LiquidMediaCard(
-            media = uiState.activeMedia,
-            reducedMotion = prefs.effectiveReducedMotion,
-            onOpenPlayer = onOpenActiveMediaPlayer,
-            onPrevious = onSkipMediaPrevious,
-            onPlayPause = onToggleMediaPlayPause,
-            onNext = onSkipMediaNext
-          )
-        }
-      }
-
-      Spacer(modifier = Modifier.height(if (hasActiveMedia) 16.dp else 26.dp))
+      Spacer(modifier = Modifier.height(26.dp))
 
       // Compact icon-only favorite rail offset past the invisible left scrub gutter
       Box(
@@ -211,7 +179,7 @@ fun HomeScreen(
           modifier = Modifier
             .verticalScroll(rememberScrollState())
             .testTag("home_favorites_rail"),
-          verticalArrangement = Arrangement.spacedBy(if (hasActiveMedia) 11.dp else 14.dp),
+          verticalArrangement = Arrangement.spacedBy(14.dp),
           horizontalAlignment = Alignment.Start
         ) {
           uiState.homeShortcutApps.forEach { app ->

@@ -157,7 +157,9 @@ fun SettingsScreen(
         SectionBlock(title = "Performance & Battery") {
           SegmentedPreferenceRow(
             title = "Performance Mode",
-            subtitle = if (prefs.isPowerSaver) {
+            subtitle = if (prefs.systemBatterySaver && prefs.performanceProfile == PerformanceProfile.ULTRA_SMOOTH) {
+              "Battery Saver on — Ultra-Smooth paused, effects reduced until it turns off"
+            } else if (prefs.isPowerSaver) {
               "Low Power active — blur, motion & background prewarm reduced for battery"
             } else {
               "Ultra-Smooth active — 120Hz GPU springs, frosted blur & prewarmed icons"
