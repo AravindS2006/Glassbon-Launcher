@@ -137,6 +137,8 @@ private data class TransientUiState(
   val showWalkthrough: Boolean = false,
   val walkthroughStep: Int = 0,
   val activeOverlay: LauncherOverlay = LauncherOverlay.NONE,
+  /** Overlay to return to when [activeOverlay] is closed (e.g. Wallpaper Studio opened from Preferences). */
+  val overlayReturnTo: LauncherOverlay = LauncherOverlay.NONE,
   val contextMenuApp: AppInfo? = null,
   val isDefaultLauncher: Boolean = false,
   val statusMessage: String? = null
@@ -187,7 +189,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val hiddenSet = prefs.hiddenKeys
     val visibleApps = allApps.filterNot { it.componentKey in hiddenSet }
     val sections = AppIndexHelper.groupAppsBySection(visibleApps)
-    val favoriteApps = prefs.favoriteKeys.mapNotNull { key -> appByKey[key] }
+    // Hidden apps must not leak back onto the Home dock or the drawer's Favorites section
+    val favoriteApps = prefs.favoriteKeys
+      .filterNot { it in hiddenSet }
+      .mapNotNull { key -> appByKey[key] }
     val homeShortcutApps = favoriteApps.take(prefs.homeShortcutLimit)
     val hiddenApps = hiddenSet.mapNotNull { key -> appByKey[key] }
       .sortedBy { it.label.lowercase() }
@@ -462,6 +467,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         launchLockAppAfterPick = false,
         showWalkthrough = false,
         activeOverlay = LauncherOverlay.NONE,
+        overlayReturnTo = LauncherOverlay.NONE,
         contextMenuApp = null,
         statusMessage = null
       )
@@ -477,6 +483,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         searchQuery = if (withSearch) it.searchQuery else "",
         showQuickActions = false,
         activeOverlay = LauncherOverlay.NONE,
+        overlayReturnTo = LauncherOverlay.NONE,
         contextMenuApp = null
       )
     }
@@ -671,6 +678,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update {
       it.copy(
         activeOverlay = overlay,
+        overlayReturnTo = if (it.activeOverlay == LauncherOverlay.SETTINGS && overlay != LauncherOverlay.SETTINGS) {
+          LauncherOverlay.SETTINGS
+        } else {
+          LauncherOverlay.NONE
+        },
         showQuickActions = false,
         contextMenuApp = null
       )
@@ -691,7 +703,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
   }
 
   fun closeOverlay() {
-    transientState.update { it.copy(activeOverlay = LauncherOverlay.NONE) }
+    transientState.update {
+      it.copy(activeOverlay = it.overlayReturnTo, overlayReturnTo = LauncherOverlay.NONE)
+    }
   }
 
   fun openContextMenu(app: AppInfo) {
@@ -710,6 +724,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         isSearchActive = false,
         showQuickActions = false,
         activeOverlay = LauncherOverlay.NONE,
+        overlayReturnTo = LauncherOverlay.NONE,
         contextMenuApp = null,
         showWalkthrough = true,
         walkthroughStep = initialStep.coerceIn(0, 4)
@@ -741,43 +756,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     transientState.update { it.copy(statusMessage = null) }
   }
 
+  // Read-modify-write happens inside a single DataStore transaction, so rapid taps can never drop an update
+  // (previously these read uiState.value, which can be stale between emissions or while unsubscribed).
   fun toggleFavorite(app: AppInfo) {
-    viewModelScope.launch {
-      val current = uiState.value.preferences.favoriteKeys.toMutableList()
-      if (app.componentKey in current) {
-        current.remove(app.componentKey)
-      } else {
-        current.add(app.componentKey)
-      }
-      preferencesRepository.updateFavorites(current)
-      closeContextMenu()
-    }
+    closeContextMenu()
+    viewModelScope.launch { preferencesRepository.toggleFavorite(app.componentKey) }
   }
 
   fun moveFavorite(componentKey: String, delta: Int) {
     viewModelScope.launch {
-      val current = uiState.value.preferences.favoriteKeys.toMutableList()
-      val index = current.indexOf(componentKey)
-      if (index == -1) return@launch
-      val target = (index + delta).coerceIn(0, current.lastIndex)
-      if (target == index) return@launch
-      val item = current.removeAt(index)
-      current.add(target, item)
-      preferencesRepository.updateFavorites(current)
+      // Step over favorites whose app is no longer installed so every move visibly reorders the dock
+      val installedKeys = appRepository.apps.value.mapTo(HashSet()) { it.componentKey }
+      val uninstalledFavorites = preferencesRepository.preferences.first().favoriteKeys
+        .filterNotTo(HashSet()) { it in installedKeys }
+      preferencesRepository.moveFavorite(componentKey, delta, skipKeys = uninstalledFavorites)
     }
   }
 
   fun toggleHideApp(app: AppInfo) {
-    viewModelScope.launch {
-      val hidden = uiState.value.preferences.hiddenKeys.toMutableSet()
-      if (app.componentKey in hidden) {
-        hidden.remove(app.componentKey)
-      } else {
-        hidden.add(app.componentKey)
-      }
-      preferencesRepository.setHiddenKeys(hidden)
-      closeContextMenu()
-    }
+    closeContextMenu()
+    viewModelScope.launch { preferencesRepository.toggleHidden(app.componentKey) }
   }
 
   fun openAppInfo(app: AppInfo) {

@@ -68,10 +68,7 @@ class PreferencesRepository(private val context: Context) {
   }
 
   val preferences: Flow<LauncherPreferences> = dataStore.data.map { prefs ->
-    val orderedFavorites = prefs[Keys.FAVORITE_KEYS_ORDERED]
-      ?.split("|")
-      ?.filter { it.isNotBlank() }
-      ?: emptyList()
+    val orderedFavorites = decodeFavorites(prefs[Keys.FAVORITE_KEYS_ORDERED])
 
     LauncherPreferences(
       favoriteKeys = orderedFavorites,
@@ -118,6 +115,50 @@ class PreferencesRepository(private val context: Context) {
       }
     }
   }
+
+  /** Atomically adds/removes [componentKey] from the ordered favorites inside a single DataStore transaction. */
+  suspend fun toggleFavorite(componentKey: String) {
+    dataStore.edit { prefs ->
+      val current = decodeFavorites(prefs[Keys.FAVORITE_KEYS_ORDERED]).toMutableList()
+      if (!current.remove(componentKey)) current.add(componentKey)
+      prefs[Keys.FAVORITE_KEYS_ORDERED] = current.distinct().joinToString("|")
+      prefs[Keys.FAVORITES_SEEDED] = true
+    }
+  }
+
+  /**
+   * Atomically moves [componentKey] by [delta] positions within the ordered favorites. Positions are counted
+   * among favorites that are currently shown (hidden apps and keys in [skipKeys] are stepped over), so each
+   * move always produces a visible change.
+   */
+  suspend fun moveFavorite(componentKey: String, delta: Int, skipKeys: Set<String> = emptySet()) {
+    dataStore.edit { prefs ->
+      val current = decodeFavorites(prefs[Keys.FAVORITE_KEYS_ORDERED]).toMutableList()
+      val hidden = prefs[Keys.HIDDEN_KEYS] ?: emptySet()
+      val shown = current.filterNot { it in hidden || it in skipKeys }
+      val shownIndex = shown.indexOf(componentKey)
+      if (shownIndex == -1) return@edit
+      val shownTarget = (shownIndex + delta).coerceIn(0, shown.lastIndex)
+      if (shownTarget == shownIndex) return@edit
+      val neighbor = shown[shownTarget]
+      current.remove(componentKey)
+      val neighborIndex = current.indexOf(neighbor)
+      current.add(if (delta > 0) neighborIndex + 1 else neighborIndex, componentKey)
+      prefs[Keys.FAVORITE_KEYS_ORDERED] = current.joinToString("|")
+    }
+  }
+
+  /** Atomically hides or un-hides [componentKey]. */
+  suspend fun toggleHidden(componentKey: String) {
+    dataStore.edit { prefs ->
+      val hidden = (prefs[Keys.HIDDEN_KEYS] ?: emptySet()).toMutableSet()
+      if (!hidden.remove(componentKey)) hidden.add(componentKey)
+      prefs[Keys.HIDDEN_KEYS] = hidden
+    }
+  }
+
+  private fun decodeFavorites(raw: String?): List<String> =
+    raw?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
 
   suspend fun setHiddenKeys(hiddenKeys: Set<String>) {
     dataStore.edit { prefs ->

@@ -63,4 +63,36 @@ class AppIndexHelperTest {
     val empty = AppIndexHelper.filterApps(apps, "nonexistent")
     assertEquals(0, empty.size)
   }
+
+  @Test
+  fun `filterApps ranks prefix and word-start matches above substrings`() {
+    // Input is alphabetical, as produced by sortAppsAlphabetically
+    val apps = listOf(app("Authenticator"), app("Maps"), app("Photomath"), app("YouTube Music"))
+    assertEquals(
+      listOf("Maps", "Photomath"),
+      AppIndexHelper.filterApps(apps, "ma").map { it.label }
+    )
+    // Equal-rank substring matches keep alphabetical order
+    assertEquals(
+      listOf("Authenticator", "YouTube Music"),
+      AppIndexHelper.filterApps(apps, "ic").map { it.label }
+    )
+    assertEquals("YouTube Music", AppIndexHelper.filterApps(apps, "mus").first().label)
+  }
+
+  @Test
+  fun `filterApps is accent-insensitive and matches initials and multiple words`() {
+    val apps = listOf(app("Café Finder"), app("Google Maps", "com.google.android.apps.maps"), app("Gmail", "com.google.android.gm"))
+    assertEquals(listOf("Café Finder"), AppIndexHelper.filterApps(apps, "cafe").map { it.label })
+    assertEquals("Google Maps", AppIndexHelper.filterApps(apps, "goo ma").single().label)
+    // "gm": Gmail is a label prefix (80) so it outranks the Google Maps initials match (50)
+    assertEquals(listOf("Gmail", "Google Maps"), AppIndexHelper.filterApps(apps, "gm").map { it.label })
+  }
+
+  @Test
+  fun `filterApps ignores reverse-domain package prefix`() {
+    val apps = listOf(app("Notes", "com.vendor.notes"), app("Weather", "com.vendor.weather"))
+    assertEquals(0, AppIndexHelper.filterApps(apps, "com").size)
+    assertEquals(2, AppIndexHelper.filterApps(apps, "vendor").size)
+  }
 }
