@@ -47,12 +47,52 @@ object AppIndexHelper {
     }
   }
 
+  /**
+   * Returns the apps matching [query], best matches first. Matching is case- and accent-insensitive
+   * ("cafe" finds "Café"). Ranking, highest first:
+   * exact label > label prefix > word prefix ("mus" -> "YouTube Music") > initials ("gm" -> "Google Maps") >
+   * label substring > every query word matches > package name.
+   * Ties keep the original (alphabetical) order.
+   */
   fun filterApps(apps: List<AppInfo>, query: String): List<AppInfo> {
-    val normalizedQuery = query.trim()
-    if (normalizedQuery.isEmpty()) return apps
-    return apps.filter { app ->
-      app.label.contains(normalizedQuery, ignoreCase = true) ||
-        app.packageName.contains(normalizedQuery, ignoreCase = true)
+    val q = normalizeForSearch(query)
+    if (q.isEmpty()) return apps
+    val tokens = q.split(' ')
+    return apps
+      .mapIndexedNotNull { index, app ->
+        val score = matchScore(app, q, tokens)
+        if (score > 0) IndexedValue(index, app) to score else null
+      }
+      .sortedWith(compareByDescending<Pair<IndexedValue<AppInfo>, Int>> { it.second }.thenBy { it.first.index })
+      .map { it.first.value }
+  }
+
+  internal fun normalizeForSearch(text: String): String {
+    val decomposed = Normalizer.normalize(text, Normalizer.Form.NFD)
+    return COMBINING_MARKS.replace(decomposed, "")
+      .lowercase(Locale.ROOT)
+      .trim()
+      .replace(WHITESPACE, " ")
+  }
+
+  private fun matchScore(app: AppInfo, q: String, tokens: List<String>): Int {
+    val label = normalizeForSearch(app.label)
+    val words = label.split(WORD_SEPARATORS).filter { it.isNotEmpty() }
+    return when {
+      label == q -> 100
+      label.startsWith(q) -> 80
+      words.any { it.startsWith(q) } -> 60
+      q.length >= 2 && !q.contains(' ') && words.joinToString("") { it.take(1) }.startsWith(q) -> 50
+      label.contains(q) -> 40
+      tokens.size > 1 && tokens.all { token -> words.any { it.startsWith(token) } } -> 35
+      tokens.size > 1 && tokens.all { label.contains(it) } -> 30
+      // Skip the reverse-domain prefix ("com.", "org.") so short queries like "co" don't match every app
+      app.packageName.substringAfter('.').lowercase(Locale.ROOT).contains(q) -> 10
+      else -> 0
     }
   }
+
+  private val COMBINING_MARKS = Regex("\\p{Mn}+")
+  private val WHITESPACE = Regex("\\s+")
+  private val WORD_SEPARATORS = Regex("[^\\p{L}\\p{N}]+")
 }

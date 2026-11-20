@@ -2,8 +2,13 @@ package com.example.data.media
 
 import android.content.Context
 import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import com.example.platform.SystemActionsHelper
@@ -44,18 +49,68 @@ class MediaRepository(private val context: Context) {
 
   private var pauseGraceJob: Job? = null
   private var explicitPauseExpiresAtMs: Long = 0L
+  private var pendingRefreshJob: Job? = null
+  private var pauseRequestedAtMs: Long = 0L
+  private var playbackCallback: Any? = null
 
   fun startObserving() {
+    registerPlaybackCallback()
     refreshSessions()
   }
 
   fun stopObserving() {
+    unregisterPlaybackCallback()
+    pendingRefreshJob?.cancel()
+    pendingRefreshJob = null
     clearPauseGrace()
+  }
+
+  /**
+   * On API 26+ AudioManager reports playback start/stop for every app without any permission, so the Home media
+   * card follows music started or stopped elsewhere (headphones, notification, other apps) instead of only
+   * refreshing on launcher start or after its own buttons are pressed.
+   */
+  private fun registerPlaybackCallback() {
+    if (playbackCallback != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    val mgr = audioManager ?: return
+    playbackCallback = runCatching {
+      createPlaybackCallback().also { mgr.registerAudioPlaybackCallback(it, Handler(Looper.getMainLooper())) }
+    }.getOrNull()
+  }
+
+  private fun unregisterPlaybackCallback() {
+    val callback = playbackCallback ?: return
+    playbackCallback = null
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      runCatching { audioManager?.unregisterAudioPlaybackCallback(callback as AudioManager.AudioPlaybackCallback) }
+    }
+  }
+
+  @RequiresApi(Build.VERSION_CODES.O)
+  private fun createPlaybackCallback() = object : AudioManager.AudioPlaybackCallback() {
+    override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>?) {
+      scheduleRefresh()
+    }
+  }
+
+  /** Coalesces bursts of playback callbacks and gives isMusicActive a moment to settle. */
+  private fun scheduleRefresh(delayMs: Long = 150L) {
+    pendingRefreshJob?.cancel()
+    pendingRefreshJob = scope.launch {
+      delay(delayMs)
+      refreshSessions()
+    }
   }
 
   fun refreshSessions() {
     val active = runCatching { audioManager?.isMusicActive == true }.getOrDefault(false)
     val now = SystemClock.elapsedRealtime()
+    val sincePauseRequest = now - pauseRequestedAtMs
+    if (active && explicitPauseExpiresAtMs > now && sincePauseRequest < PAUSE_SETTLE_MS) {
+      // The player hasn't processed our pause key yet; keep showing "Paused" and check again once it settles.
+      scheduleRefresh(PAUSE_SETTLE_MS - sincePauseRequest)
+      return
+    }
     val inPauseGrace = !active && now < explicitPauseExpiresAtMs
 
     if (active) {
@@ -84,7 +139,8 @@ class MediaRepository(private val context: Context) {
     val currentlyPlaying = runCatching { audioManager?.isMusicActive == true }.getOrDefault(false)
     sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
     if (currentlyPlaying) {
-      explicitPauseExpiresAtMs = SystemClock.elapsedRealtime() + 12_000L
+      pauseRequestedAtMs = SystemClock.elapsedRealtime()
+      explicitPauseExpiresAtMs = pauseRequestedAtMs + 12_000L
       pauseGraceJob?.cancel()
       pauseGraceJob = scope.launch {
         _mediaState.value = ActiveMediaState(
@@ -100,29 +156,20 @@ class MediaRepository(private val context: Context) {
       }
     } else {
       clearPauseGrace()
-      scope.launch {
-        delay(150L)
-        refreshSessions()
-      }
+      scheduleRefresh()
     }
   }
 
   fun skipToNext() {
     clearPauseGrace()
     sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
-    scope.launch {
-      delay(150L)
-      refreshSessions()
-    }
+    scheduleRefresh()
   }
 
   fun skipToPrevious() {
     clearPauseGrace()
     sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-    scope.launch {
-      delay(150L)
-      refreshSessions()
-    }
+    scheduleRefresh()
   }
 
   fun openActivePlayer() {
@@ -136,6 +183,10 @@ class MediaRepository(private val context: Context) {
       mgr.dispatchMediaKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0))
       mgr.dispatchMediaKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0))
     }
+  }
+
+  private companion object {
+    const val PAUSE_SETTLE_MS = 1_000L
   }
 
   private fun clearPauseGrace() {

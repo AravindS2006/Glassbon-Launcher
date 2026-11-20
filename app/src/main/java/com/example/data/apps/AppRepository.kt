@@ -200,13 +200,12 @@ class AppRepository(
   fun launchApp(app: AppInfo, callerContext: Context = context): Boolean {
     val now = SystemClock.elapsedRealtime()
     if (lastLaunchedComponent == app.componentKey && now - lastLaunchElapsedMs < 350L) {
-      return false
+      // Duplicate tap swallowed: the first tap already launched the app, so this is not a failure.
+      // Returning false here used to surface "<app> is unavailable" and re-open the lock app picker.
+      return true
     }
-    lastLaunchedComponent = app.componentKey
-    lastLaunchElapsedMs = now
-
     val component = ComponentName(app.packageName, app.activityName)
-    return try {
+    val launched = try {
       val launchIntent = Intent.makeMainActivity(component).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
       }
@@ -220,6 +219,12 @@ class AppRepository(
       refreshApps()
       false
     }
+    // Only arm the debounce after a successful launch so a failed attempt can be retried immediately.
+    if (launched) {
+      lastLaunchedComponent = app.componentKey
+      lastLaunchElapsedMs = now
+    }
+    return launched
   }
 
   private fun launchViaLauncherAppsOrRefresh(
