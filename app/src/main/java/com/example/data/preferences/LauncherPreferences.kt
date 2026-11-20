@@ -87,10 +87,12 @@ data class LauncherPreferences(
   val onboardingDismissed: Boolean = false,
   val walkthroughCompleted: Boolean = false,
   val quickActionsDiscovered: Boolean = false,
-  val favoritesSeeded: Boolean = false
+  val favoritesSeeded: Boolean = false,
+  /** Live (not persisted) mirror of Android's system Battery Saver; forces the low-power path while it is on. */
+  val systemBatterySaver: Boolean = false
 ) {
   val isPowerSaver: Boolean
-    get() = performanceProfile == PerformanceProfile.POWER_SAVER
+    get() = performanceProfile == PerformanceProfile.POWER_SAVER || systemBatterySaver
 
   val effectiveReducedMotion: Boolean
     get() = reducedMotion || isPowerSaver

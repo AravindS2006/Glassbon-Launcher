@@ -12,9 +12,6 @@
     <string name="cd_favorites_index">Jump to favorites</string>
     <string name="cd_back">Navigate back</string>
     <string name="cd_open_drawer">Open application library</string>
-    <string name="cd_media_previous">Previous track</string>
-    <string name="cd_media_play_pause">Play or pause</string>
-    <string name="cd_media_next">Next track</string>
     <string name="onboarding_title">Set Glassbon as your Home</string>
     <string name="onboarding_tour_only_title">Explore Glassbon</string>
     <string name="onboarding_body">Make Glassbon default Home. Hold bottom-right button anytime for Quick Actions.</string>

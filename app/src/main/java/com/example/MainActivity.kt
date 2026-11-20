@@ -77,6 +77,11 @@ class MainActivity : ComponentActivity() {
     viewModel.onAppStop()
   }
 
+  override fun onTrimMemory(level: Int) {
+    super.onTrimMemory(level)
+    viewModel.onTrimMemory(level)
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)

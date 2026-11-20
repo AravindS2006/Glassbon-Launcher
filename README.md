@@ -43,7 +43,6 @@
   - Edge-to-edge grayscale misty alpine forest wallpaper (or any personal photo via Android's zero-permission **Photo Picker**) with off-thread `RGB_565` bitmap caching.
   - **Adaptive Multi-Zone Luminance Contrast**: Samples top, middle, and side-edge wallpaper luminance once off-thread (`12×12` grid) to adjust status bar icons, clock/date ink, right-edge contrast scrims, and favorite icon backing automatically.
   - **Unified Clock & Frosted Calendar Pill**: Styled in **Plus Jakarta Sans** or **Instrument Serif**; tap time to open Alarms/Clock or tap the frosted date pill to launch Calendar.
-  - **Smart Dynamic Media Capsule**: Appears beneath Clock/Date only while audio is playing (or briefly after you pause) and follows playback started or stopped in any app, headphones, or the notification shade — driven by Android's permission-free `AudioPlaybackCallback` (Android 8+), registered only while the launcher is visible.
 - **Single Shared Dual-Edge Curved Alphabet Wave**
   - Only **one** 28-letter curved Gaussian A–Z rail is composed—touching or sliding along either the visible **Right A–Z Rail** *or* the lightweight 1-node **Hidden Left Edge** sensor drives the exact same alphabetic drawer list (`28.dp` outer gutter protects favorites from accidental taps).
   - Only alphabet edges open the App Library (and swiping down in the drawer returns smoothly to Home)—direct vertical swipes on Home remain calm and deliberate.
@@ -79,7 +78,7 @@
 | **Left Edge Sensor** | Lightweight 1-node `28.dp` touch strip driving the single shared right A–Z rail controller | Zero duplicate 28-letter composition cost |
 | **Animations** | Finite `< 220ms` springs & tweens evaluated strictly inside `graphicsLayer` / `offset` | Zero full-tree recompositions; snapped in **Low Power** / **Reduced Motion** |
 | **Clock & Guided Tour** | Event-driven `ACTION_TIME_TICK`; `WalkthroughOverlay` is only composed while explicitly open | Zero background loops, listeners, or idle overhead |
-| **Media Capsule** | Event-driven `AudioManager.AudioPlaybackCallback` registered in `onStart` and removed in `onStop`, with coalesced refreshes | No polling; zero work while the launcher is in the background |
+| **Battery Saver & Memory** | Follows Android's system Battery Saver (`ACTION_POWER_SAVE_MODE_CHANGED`, only while visible) and trims the icon cache on `onTrimMemory` | Ultra-Smooth automatically drops to the low-power path when the phone is saving battery |
 
 ---
 

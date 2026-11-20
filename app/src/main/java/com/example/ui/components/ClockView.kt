@@ -55,7 +55,6 @@ fun ClockView(
   showDate: Boolean,
   isTopBright: Boolean,
   typographyStyle: TypographyStyle = TypographyStyle.CLEAN_SANS,
-  isMediaActive: Boolean = false,
   onClockClick: () -> Unit,
   onDateClick: () -> Unit,
   modifier: Modifier = Modifier
@@ -109,19 +108,15 @@ fun ClockView(
     val isNarrow = maxWidth < 290.dp
     val clockFontSize = when {
       useSans && isNarrow -> 56.sp
-      useSans && !isMediaActive -> 70.sp
-      useSans -> 60.sp
+      useSans -> 70.sp
       isNarrow -> 62.sp
-      !isMediaActive -> 78.sp
-      else -> 68.sp
+      else -> 78.sp
     }
     val clockLineHeight = when {
       useSans && isNarrow -> 58.sp
-      useSans && !isMediaActive -> 72.sp
-      useSans -> 62.sp
+      useSans -> 72.sp
       isNarrow -> 64.sp
-      !isMediaActive -> 78.sp
-      else -> 68.sp
+      else -> 78.sp
     }
 
     Column(
@@ -207,7 +202,7 @@ fun ClockView(
               text = snapshot.formattedDate.uppercase(),
               fontFamily = FunctionalSansFontFamily,
               fontWeight = FontWeight.Medium,
-              fontSize = if (isMediaActive || isNarrow) 11.5.sp else 12.sp,
+              fontSize = if (isNarrow) 11.5.sp else 12.sp,
               lineHeight = 15.sp,
               letterSpacing = 0.85.sp,
               maxLines = 1,

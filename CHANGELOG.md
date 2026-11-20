@@ -11,9 +11,14 @@ All notable changes to **Glassbon Launcher** are documented in this file.
 - **Smooth Alphabet Spotlight Glide & Zero-Battery Performance Modes**: Selecting or sliding along the alphabet glides smoothly at 60–120 FPS with GPU depth lift/recede while settling a single drawer-cached bounded `BlurEffect` on neighboring sections; **Low Power** mode eliminates pre-blur decode, icon prewarming, animations, and shrinks cache allocations for minimal battery/CPU footprint.
 - **Single Shared Dual-Edge Alphabet Rail**: Replaced duplicate left/right 28-letter rails with a single shared `AlphabetRailController` plus a 1-node `LeftAlphabetEdgeSensor`, letting both screen edges control the same alphabetic drawer list with zero duplicate UI cost.
 - **Ranked, Accent-Insensitive App Search**: `AppIndexHelper.filterApps` now orders results by relevance (exact → prefix → word prefix → initials → substring → package), ignores accents (`cafe` → *Café*), supports multi-word queries, and skips reverse-domain package prefixes so `co` no longer matches every app. Enter launches the best match.
-- **Live Media Capsule Updates**: `MediaRepository` registers a permission-free `AudioPlaybackCallback` (Android 8+) while the launcher is visible, so the Home media capsule reacts to playback started or stopped outside Glassbon, with a settle guard that prevents flicker right after pausing.
 - **Preferences Back-Stack**: Wallpaper Studio, Favorites Manager, and Hidden Apps opened from Preferences now return to Preferences on Back instead of jumping to Home.
 - **CI Auto-Changelog Generation**: Added `.github/scripts/generate_changelog.py` to `.github/workflows/android-release.yml` so GitHub Releases and empty changelog entries are automatically populated from `[Unreleased]`, conventional commits, or fallback highlights whenever manual notes are omitted.
+
+### Changed
+- **Removed the System Audio Media Capsule**: It could only detect that *some* audio was playing (no title, artist, or artwork), so it was removed along with its `AudioPlaybackCallback`, freeing Home space and eliminating wake-ups on every system audio change.
+- **Battery Saver Aware Ultra-Smooth**: While Android's system Battery Saver is on, Glassbon automatically uses the Low Power path (no blur, icon prewarm, or animations) without changing your saved Performance Mode.
+- **Fewer Background Re-Queries**: Returning Home no longer re-queries the full app list from PackageManager each time; live package/locale receivers keep it current, with a 5-minute safety refresh.
+- **Memory-Pressure Friendly**: The icon cache shrinks when Android reports memory pressure (`onTrimMemory`), helping other apps stay in memory.
 
 ### Fixed
 - **False "App Unavailable" on Double-Tap**: A second tap within the 350 ms launch debounce was reported as a failed launch, showing "*App* is unavailable" and re-opening the Lock app picker. Debounced taps are now treated as success, and the debounce only arms after a successful launch.

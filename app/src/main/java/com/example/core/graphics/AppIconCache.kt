@@ -41,6 +41,11 @@ class AppIconCache(private val context: Context) {
     }
   }
 
+  /** Releases most cached bitmaps when Android signals memory pressure; icons reload lazily on demand. */
+  fun trimForMemoryPressure() {
+    cache.trimToSize(lowPowerEntries / 2)
+  }
+
   fun getCached(componentKey: String, style: IconStyle): ImageBitmap? {
     return cache.get("${componentKey}_${style.name}")
   }
